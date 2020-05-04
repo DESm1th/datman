@@ -40,16 +40,16 @@ class Metric(ABC):
     def manifest_path(self):
         return self.output_root + "_manifest.json"
 
-    def __init__(self, input_nii, output_dir, refresh=False):
+    def __init__(self, input_nii, output_dir, overwrite=False):
         self.input = input_nii
         self.output_root = os.path.join(output_dir, nifti_basename(input_nii))
         self.outputs = self.set_outputs()
+        self.write_manifest(overwrite)
 
-        if not os.path.exists(self.manifest_path) or refresh:
-            self.refresh_manifest()
-
-    def refresh_manifest(self):
+    def write_manifest(self, overwrite=False):
         if os.path.exists(self.manifest_path):
+            if not overwrite:
+                return
             orig = self.read_json()
         else:
             orig = {}
@@ -61,7 +61,7 @@ class Metric(ABC):
 
     def write_json(self, contents):
         with open(self.manifest_path, "w") as fh:
-            json.dump(self.contents, fh)
+            json.dump(contents, fh, indent=4)
 
     def read_json(self):
         with open(self.manifest_path, "r") as fh:
@@ -100,6 +100,8 @@ class Metric(ABC):
         for command in self.commands:
             if not self.command_succeeded(command)[0]:
                 return False
+        if not os.path.exists(self.manifest_path):
+            return False
         return True
 
     def command_succeeded(self, command_name):
@@ -186,6 +188,8 @@ class Metric(ABC):
 
 
 class DTIMetrics(Metric):
+    input = None
+    output_root = None
     outputs = {
         'montage': {
             '_montage.png': QCOutput(1)
@@ -225,6 +229,8 @@ class DTIMetrics(Metric):
 
 
 class AnatMetrics(Metric):
+    input = None
+    output_root = None
     outputs = {
         'images': {
             '.png': QCOutput(1)
@@ -236,11 +242,8 @@ class AnatMetrics(Metric):
 
 
 class FMRIMetrics(Metric):
-    files = None
-    images = None
     input = None
     output_root = None
-
     outputs = {
         'qc-scanlength': {
             '_scanlengths.csv': None
