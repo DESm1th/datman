@@ -40,11 +40,10 @@ class Metric(ABC):
     def manifest_path(self):
         return self.output_root + "_manifest.json"
 
-    def __init__(self, input_nii, output_dir, overwrite=False):
+    def __init__(self, input_nii, output_dir):
         self.input = input_nii
         self.output_root = os.path.join(output_dir, nifti_basename(input_nii))
         self.outputs = self.set_outputs()
-        self.write_manifest(overwrite)
 
     def write_manifest(self, overwrite=False):
         if os.path.exists(self.manifest_path):
@@ -57,13 +56,13 @@ class Metric(ABC):
         manifest = self.make_manifest()
 
         if orig != manifest:
-            self.write_json(manifest)
+            self._write_json(manifest)
 
-    def write_json(self, contents):
+    def _write_json(self, contents):
         with open(self.manifest_path, "w") as fh:
             json.dump(contents, fh, indent=4)
 
-    def read_json(self):
+    def read_manifest(self):
         with open(self.manifest_path, "r") as fh:
             contents = json.load(fh)
         return contents
@@ -87,6 +86,14 @@ class Metric(ABC):
             requires.extend(found)
         return requires
 
+    def is_runnable(self):
+        requires = self.get_requirements()
+        for prereq in requires:
+            code, _ = run(f"which {prereq}")
+            if code != 0:
+                return False
+        return True
+
     def set_outputs(self):
         outputs = {}
         for command in self.outputs:
@@ -97,7 +104,7 @@ class Metric(ABC):
         return outputs
 
     def exists(self):
-        for command in self.commands:
+        for command in self.outputs:
             if not self.command_succeeded(command)[0]:
                 return False
         if not os.path.exists(self.manifest_path):
@@ -105,10 +112,10 @@ class Metric(ABC):
         return True
 
     def command_succeeded(self, command_name):
-        if command_name not in self.commands:
+        if command_name not in self.outputs:
             return os.path.isfile(command_name), command_name
 
-        for output in self.commands[command_name]:
+        for output in self.outputs[command_name]:
             if not os.path.exists(output):
                 return False, output
         return True, None
