@@ -218,6 +218,7 @@ class DTIMetrics(MetricDTI):
             "_b0.png": QCOutput(2, "b0 Montage")
         },
         "qc-dti": {
+            "_qascripts_dti.csv": None,
             "_stats.csv": None,
             "_directions.png": QCOutput(3, "bvec Directions")
         },
@@ -270,11 +271,10 @@ class FMRIMetrics(Metric):
     }
 
     def generate(self, img_gap=2, width=1600):
-        scanlengths = self.output_root + "_scanlengths.csv"
-        self.run(f"qc-scanlength {self.input} {scanlengths}", "qc-scanlength")
-
-        stats = self.output_root + "_stats.csv"
-        self.run(f"qc-fmri {self.input} {stats}", "qc-fmri")
+        self.run(f"qc-scanlength {self.input}"
+                 f" {self.output_root + '_scanlengths.csv'}",
+                 "qc-scanlength")
+        self.run(f"qc-fmri {self.input} {self.output_root}", "qc-fmri")
 
         self.make_montage(self.output_root + "_montage.png")
         self.make_image(self.output_root + "_raw.png", img_gap, width)
