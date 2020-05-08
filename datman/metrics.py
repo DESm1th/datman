@@ -231,7 +231,8 @@ class DTIMetrics(MetricDTI):
                  f"{self.output_root}", "qc-dti")
 
         self.run(f"qc-spikecount {self.input} "
-                 f"{self.output_root + '_spikecount.csv'} {self.bval}")
+                 f"{self.output_root + '_spikecount.csv'} {self.bval}",
+                 "qc-spikecount")
 
         self.make_montage(self.output_root + "_montage.png")
         self.make_image(self.output_root + "_b0.png", img_gap, width)
