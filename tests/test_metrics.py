@@ -117,6 +117,32 @@ class TestMetric:
 
         assert mock_run.call_count == 0
 
+    @patch("datman.metrics.run")
+    @patch("os.path.exists")
+    def test_make_montage_does_nothing_when_output_exists(
+            self, mock_exist, mock_run):
+        mock_exist.return_value = True
+
+        fmri = datman.metrics.FMRIMetrics(self.nii_input, self.output_dir)
+        test_output = fmri.output_root + "_montage_test.png"
+
+        fmri.make_montage(test_output)
+        assert mock_run.call_count == 0
+
+    @patch("datman.metrics.run")
+    @patch("os.path.exists")
+    def test_make_montage_raises_exception_if_output_not_created(
+            self, mock_exist, mock_run):
+
+        fmri = datman.metrics.FMRIMetrics(self.nii_input, self.output_dir)
+        test_output = fmri.output_root + "_montage_test.png"
+
+        mock_exist.side_effect = lambda x: x != test_output
+
+        assert not os.path.exists(test_output)
+        with pytest.raises(datman.exceptions.QCException):
+            fmri.make_montage(test_output)
+
     def get_outputs(self, metric):
         outputs = []
         for command in metric.outputs:
