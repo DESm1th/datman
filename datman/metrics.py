@@ -20,20 +20,16 @@ class QCOutput:
 class Metric(ABC):
 
     requires = {
-        'images': ['slicer'],
-        'montage': ['slicer', 'pngappend']
+        "images": ["slicer"],
+        "montage": ["slicer", "pngappend"]
     }
 
     @abstractmethod
-    def input(self):
-        pass
-
-    @abstractmethod
-    def output_root(self):
-        pass
-
-    @abstractmethod
     def outputs(self):
+        pass
+
+    @abstractmethod
+    def generate(self):
         pass
 
     @property
@@ -72,7 +68,7 @@ class Metric(ABC):
         for command in self.outputs:
             for file_path in self.outputs[command]:
                 output = self.outputs[command][file_path]
-                if output:
+                if isinstance(output, QCOutput):
                     manifest[file_path] = vars(output)
         return manifest
 
@@ -113,7 +109,7 @@ class Metric(ABC):
 
     def command_succeeded(self, command_name):
         if command_name not in self.outputs:
-            return os.path.isfile(command_name), command_name
+            return os.path.exists(command_name), command_name
 
         for output in self.outputs[command_name]:
             if not os.path.exists(output):
@@ -194,39 +190,45 @@ class Metric(ABC):
             raise QCException(f"Failed generating montage {output}")
 
 
-class DTIMetrics(Metric):
-    input = None
-    output_root = None
-    outputs = {
-        'montage': {
-            '_montage.png': QCOutput(1)
-        },
-        'images': {
-            '_b0.png': QCOutput(2, 'b0 Montage')
-        },
-        'qc-dti': {
-            '_stats.csv': None,
-            '_directions.png': QCOutput(3, 'bvec Directions')
-        },
-        'qc-spikecount': {
-            '_spikecount.csv': None
-        }
-    }
-
-    def __init__(self, nii_input, output_dir):
-        input_root = os.path.join(os.path.basename(nii_input),
+class MetricDTI(Metric):
+    def __init__(self, nii_input, output_dir, bval=None, bvec=None):
+        input_root = os.path.join(os.path.dirname(nii_input),
                                   nifti_basename(nii_input))
-        bvec = input_root + ".bvec"
-        bval = input_root + ".bval"
-        if not os.path.exists(bvec) or not os.path.exists(bval):
+
+        if not bvec:
+            bvec = input_root + ".bvec"
+        if not bval:
+            bval = input_root + ".bval"
+
+        self.bvec = bvec
+        self.bval = bval
+        if not os.path.exists(self.bvec) or not os.path.exists(self.bval):
             raise QCException(f"Can't process {nii_input} - bvec or bval file "
                               "missing.")
 
         super().__init__(nii_input, output_dir)
 
+
+class DTIMetrics(MetricDTI):
+    outputs = {
+        "montage": {
+            "_montage.png": QCOutput(1)
+        },
+        "images": {
+            "_b0.png": QCOutput(2, "b0 Montage")
+        },
+        "qc-dti": {
+            "_stats.csv": None,
+            "_directions.png": QCOutput(3, "bvec Directions")
+        },
+        "qc-spikecount": {
+            "_spikecount.csv": None
+        }
+    }
+
     def generate(self, img_gap=None, width=None):
         self.run(f"qc-dti {self.input} {self.bvec} {self.bval} "
-                 f"{self.output_root + '_stats.csv'}", 'qc-dti')
+                 f"{self.output_root + '_stats.csv'}", "qc-dti")
 
         self.run(f"qc-spikecount {self.input} "
                  f"{self.output_root + '_spikecount.csv'} {self.bval}")
@@ -236,11 +238,9 @@ class DTIMetrics(Metric):
 
 
 class AnatMetrics(Metric):
-    input = None
-    output_root = None
     outputs = {
-        'images': {
-            '.png': QCOutput(1)
+        "images": {
+            ".png": QCOutput(1)
         }
     }
 
@@ -249,24 +249,22 @@ class AnatMetrics(Metric):
 
 
 class FMRIMetrics(Metric):
-    input = None
-    output_root = None
     outputs = {
-        'qc-scanlength': {
-            '_scanlengths.csv': None
+        "qc-scanlength": {
+            "_scanlengths.csv": None
         },
-        'qc-fmri': {
-            '_stats.csv': None,
-            '_sfnr.nii.gz': None,
-            '_corr.nii.gz': None
+        "qc-fmri": {
+            "_stats.csv": None,
+            "_sfnr.nii.gz": None,
+            "_corr.nii.gz": None
         },
-        'montage': {
-            '_montage.png': QCOutput(1),
+        "montage": {
+            "_montage.png": QCOutput(1),
         },
-        'images': {
-            '_raw.png': QCOutput(2, 'BOLD Montage'),
-            '_sfnr.png': QCOutput(3, 'SFNR Map'),
-            '_corr.nii.gz': QCOutput(4, 'Correlation Map')
+        "images": {
+            "_raw.png": QCOutput(2, "BOLD Montage"),
+            "_sfnr.png": QCOutput(3, "SFNR Map"),
+            "_corr.nii.gz": QCOutput(4, "Correlation Map")
         }
     }
 
@@ -287,3 +285,89 @@ class FMRIMetrics(Metric):
                         img_gap,
                         width,
                         nii_input=self.output_root + "_corr.nii.gz")
+
+
+class AnatPHAMetrics(Metric):
+    outputs = {
+        "qc-adni": {
+            "_stats.csv": None
+        }
+    }
+
+    def generate(self):
+        self.run(f"qc-adni {self.input} {self.output_root}")
+
+
+class FMRIPHAMetrics(Metric):
+    outputs = {
+        "qc-fbirn-fmri": {
+            "_images.jpg": QCOutput(1),
+            "_plots.jpg": QCOutput(2),
+            "_stats.csv": None,
+        }
+    }
+
+    def generate(self):
+        self.run(f"qc-fbirn-fmri {self.input} {self.output_root}")
+
+
+class DTIPHAMetrics(MetricDTI):
+    outputs = {
+        "qc-fbirn-dti": {}
+    }
+
+    def generate(self):
+        self.run(f"qc-fbirn-dti {self.input} {self.bvec} {self.bval} "
+                 f"{self.output_root}")
+
+
+class QAPHAMetrics(MetricDTI):
+    outputs = {
+        "qa-dti": {
+            "B0Distortion-PAR.jpg": QCOutput(1),
+            "CentralSlice-PAR.jpg": QCOutput(2),
+            "DiffImgs-PAR.jpg": QCOutput(3),
+            "DiffMasks-PAR.jpg": QCOutput(4),
+            "MaskCentralSlice-PAR.jpg": QCOutput(5),
+            "NyquistRatio-PAR.jpg": QCOutput(6),
+            "Plot-EddyCurrentDist-PAR.jpg": QCOutput(7),
+            "SNRImgs-PAR.jpg": QCOutput(8),
+            "SNRPlots-PAR.jpg": QCOutput(9),
+            "StdPlotsHist-PAR.jpg": QCOutput(10),
+            "Section2.3.1_SNR_ADC.csv": None,
+            "Section2.3.2_B0DistortionRation.csv": None,
+            "Section2.3.3_EddyCurrentDistortions.csv": None,
+            "Section2.3.4_AveNyqRation.csv": None,
+            "Section2.3.5_FAvalues.csv": None
+        }
+    }
+
+    def __init__(self, nii_input, output_dir, bval=None, bvec=None):
+        self.accel = "NO" in nii_input
+        if not self.accel:
+            self.update_expected_outputs()
+        super().__init__(nii_input, output_dir, bval, bvec)
+
+    def update_expected_outputs(self):
+        # Create a new dictionary or the class defaults will change
+        new_outputs = {key: self.outputs[key] for key in self.outputs
+                       if key != "qa-dti"}
+        new_outputs["qa-dti"] = {
+            fname.replace("-PAR.", "-NPAR."): self.outputs["qa-dti"][fname]
+            for fname in self.outputs["qa-dti"]
+        }
+        self.outputs = new_outputs
+
+    def generate(self):
+        self.run(f"qa-dti {self.input} {self.bvec} {self.bval}"
+                 f"{' --accel ' if self.accel else ''} "
+                 f"{self.output_root}")
+
+
+class ABCDPHAMetrics(Metric):
+    outputs = {
+        "qc-abcd-fmri": {}
+    }
+
+    def generate(self):
+        self.run(f"qc-abcd-fmri {self.input} {self.output_root}")
