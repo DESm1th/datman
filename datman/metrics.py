@@ -282,7 +282,7 @@ class FMRIMetrics(Metric):
                         img_gap,
                         width,
                         nii_input=self.output_root + "_sfnr.nii.gz")
-        self.make_image(self.output.root + "_corr.png",
+        self.make_image(self.output_root + "_corr.png",
                         img_gap,
                         width,
                         nii_input=self.output_root + "_corr.nii.gz")
