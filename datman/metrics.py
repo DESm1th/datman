@@ -162,7 +162,7 @@ class Metric(ABC):
         Args:
             output (str): The full path to write the result to.
         """
-        if os.path.isfile(output):
+        if os.path.exists(output):
             return
 
         with make_temp_directory() as temp:
@@ -186,7 +186,7 @@ class Metric(ABC):
                 .format(temp, output)
             run(montage_command)
 
-        if not os.path.isfile(output):
+        if not os.path.exists(output):
             raise QCException(f"Failed generating montage {output}")
 
 
@@ -228,7 +228,7 @@ class DTIMetrics(MetricDTI):
 
     def generate(self, img_gap=None, width=None):
         self.run(f"qc-dti {self.input} {self.bvec} {self.bval} "
-                 f"{self.output_root + '_stats.csv'}", "qc-dti")
+                 f"{self.output_root}", "qc-dti")
 
         self.run(f"qc-spikecount {self.input} "
                  f"{self.output_root + '_spikecount.csv'} {self.bval}")
