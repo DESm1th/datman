@@ -256,6 +256,9 @@ class FMRIMetrics(Metric):
             "_scanlengths.csv": None
         },
         "qc-fmri": {
+            "_fd.csv": None,
+            "_qascripts_bold.csv": None,
+            "_spectra.csv": None,
             "_stats.csv": None,
             "_sfnr.nii.gz": None,
             "_corr.nii.gz": None
@@ -266,7 +269,7 @@ class FMRIMetrics(Metric):
         "images": {
             "_raw.png": QCOutput(2, "BOLD Montage"),
             "_sfnr.png": QCOutput(3, "SFNR Map"),
-            "_corr.nii.gz": QCOutput(4, "Correlation Map")
+            "_corr.png": QCOutput(4, "Correlation Map")
         }
     }
 
