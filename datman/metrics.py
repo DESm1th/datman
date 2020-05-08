@@ -226,7 +226,7 @@ class DTIMetrics(MetricDTI):
         }
     }
 
-    def generate(self, img_gap=None, width=None):
+    def generate(self, img_gap=2, width=1600):
         self.run(f"qc-dti {self.input} {self.bvec} {self.bval} "
                  f"{self.output_root}", "qc-dti")
 
@@ -245,7 +245,7 @@ class AnatMetrics(Metric):
         }
     }
 
-    def generate(self, img_gap=5, width=None):
+    def generate(self, img_gap=5, width=1600):
         self.make_image(self.output_root + ".png", img_gap, width)
 
 
@@ -269,7 +269,7 @@ class FMRIMetrics(Metric):
         }
     }
 
-    def generate(self, img_gap=None, width=None):
+    def generate(self, img_gap=2, width=1600):
         scanlengths = self.output_root + "_scanlengths.csv"
         self.run(f"qc-scanlength {self.input} {scanlengths}", "qc-scanlength")
 
