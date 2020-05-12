@@ -209,6 +209,22 @@ class MetricDTI(Metric):
         super().__init__(nii_input, output_dir)
 
 
+class Ignore(Metric):
+    outputs = {}
+
+    def exists(self):
+        return True
+
+    def is_runnable(self):
+        return True
+
+    def generate(self):
+        return
+
+    def write_manifest(self):
+        return
+
+
 class DTIMetrics(MetricDTI):
     outputs = {
         "montage": {
