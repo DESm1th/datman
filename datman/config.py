@@ -18,7 +18,8 @@ import wrapt
 
 import datman.scanid
 import datman.dashboard as dashboard
-from datman.exceptions import ConfigException, UndefinedSetting
+from datman.exceptions import (ConfigException, UndefinedSetting,
+                               DashboardException)
 
 logger = logging.getLogger(__name__)
 
@@ -164,15 +165,19 @@ class config(object):
             # full ID. Check for this case, exit if it's just a bad ID
             parts = filename.split('_')
             if len(parts) > 1:
-                raise datman.scanid.ParseException("Malformed ID: {}".format(
-                                                                    filename))
+                raise ConfigException("Can't determine study from malformed "
+                                      "ID: {}".format(filename))
             tag = parts[0]
             site = None
         else:
             tag = parts.study
             site = parts.site
 
-        project = dashboard.get_project(tag=tag, site=site)
+        try:
+            project = dashboard.get_project(tag=tag, site=site)
+        except DashboardException:
+            project = None
+
         if project:
             return project.id
 
@@ -181,8 +186,8 @@ class config(object):
         if tag == 'DTI' and not isinstance(parts, datman.scanid.Identifier):
             # if parts isnt a datman scanid, only the study tag was given. Cant
             # be sure which DTI study is correct without site info
-            raise RuntimeError("Cannot determine if DTI15T or DTI3T based on "
-                               "input: {}".format(filename))
+            raise ConfigException("Cannot determine if DTI15T or DTI3T based "
+                                  "on input: {}".format(filename))
 
         # If a valid project name was given instead of a study tag, return that
         projects = self.get_key('Projects')
@@ -226,7 +231,7 @@ class config(object):
         # didn't find a match throw a warning
         logger.warn('Failed to find a valid project for xnat id: {}'
                     .format(tag))
-        raise ValueError
+        raise ConfigException("Can't locate study {}".format(filename))
 
     def _search_site_conf(self, site, key):
         """
