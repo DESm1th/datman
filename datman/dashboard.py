@@ -325,6 +325,11 @@ def get_default_user():
     return user[0]
 
 
+@dashboard_required
+def get_tags(scantype=None, create=False):
+    return queries.get_scantypes(scantype, create)
+
+
 def _get_scan_name(ident, tag, series):
     name = "_".join([str(ident), tag, str(series)])
     return name
