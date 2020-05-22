@@ -330,6 +330,11 @@ def get_tags(scantype=None, create=False):
     return queries.get_scantypes(scantype, create)
 
 
+@dashboard_required
+def find_scans(search_term):
+    return queries.find_scans(search_term)
+
+
 def _get_scan_name(ident, tag, series):
     name = "_".join([str(ident), tag, str(series)])
     return name
