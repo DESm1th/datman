@@ -109,7 +109,7 @@ def filename_required(f):
 
 @dashboard_required
 def set_study_status(name, is_open):
-    studies = queries.get_study(name=name)
+    studies = queries.get_studies(name=name)
     if not studies:
         raise DashboardException("ID {} contains invalid study / site "
                                  "combination".format(name))
@@ -159,7 +159,7 @@ def get_bids_subject(bids_name, bids_session, study=None):
 @dashboard_required
 @scanid_required
 def add_subject(name):
-    studies = queries.get_study(tag=name.study, site=name.site)
+    studies = queries.get_studies(tag=name.study, site=name.site)
     if not studies:
         raise DashboardException("ID {} contains invalid study / site "
                                  "combination".format(name))
@@ -267,7 +267,7 @@ def get_bids_scan(name):
 @filename_required
 def add_scan(name, tag=None, series=None, description=None, source_id=None):
     session = get_session(name, create=True)
-    studies = queries.get_study(tag=name.study, site=name.site)
+    studies = queries.get_studies(tag=name.study, site=name.site)
     scan_name = _get_scan_name(name, tag, series)
 
     if len(studies) != 1:
@@ -297,7 +297,7 @@ def get_project(name=None, tag=None, site=None, create=False):
         raise DashboardException("Can't locate a study without the study "
                                  "nickname or a study tag")
 
-    studies = queries.get_study(name=name, tag=tag, site=site, create=create)
+    studies = queries.get_studies(name=name, tag=tag, site=site, create=create)
     search_term = name or tag
     if len(studies) == 0:
         raise DashboardException("Failed to locate study matching {}"
@@ -308,6 +308,14 @@ def get_project(name=None, tag=None, site=None, create=False):
     if not name:
         return studies[0].study
     return studies[0]
+
+
+@dashboard_required
+def get_projects():
+    # Defining this separately instead adding functionality to get_project
+    # because calls to get_project explicitly need either a single study
+    # returned or an exception. Adding a list as a return type would be bad.
+    return queries.get_studies()
 
 
 @dashboard_required
