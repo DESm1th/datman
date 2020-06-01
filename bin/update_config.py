@@ -22,10 +22,16 @@ Args:
                     a study can reference it).
 
 Options:
-    --delete        Delete tags, studies and sites not found in config files
-                    without prompting the user. This will cascade to records
-                    that reference the outdated configuration.
-    --skip          Skip all user prompts (delete nothing).
+    --accept        Automatically answer 'y' to all prompts. Use with caution:
+                    Deletes for studies + tags will purge associated
+                    scan / timepoint / session records and updates may
+                    overwrite newer information in the database if the
+                    configuration files are out of date.
+    --decline       Automatically answer 'n' to all prompts. Records found in
+                    the database that don't match configuration files will
+                    be left as is and when there's a conflict between certain
+                    values (like the contents of the readme) no changes will
+                    be made.
     --quiet, -q     Only report errors.
     --verbose, -v   Be chatty.
     --debug, -d     Be extra chatty.
@@ -47,8 +53,8 @@ logger = logging.getLogger(os.path.basename(__file__))
 def main():
     args = docopt(__doc__)
     study = args['<study>']
-    delete_all = args['--delete']
-    skip_delete = args['--skip']
+    accept_all = args['--accept']
+    skip_all = args['--decline']
     quiet = args['--quiet']
     verbose = args['--verbose']
     debug = args['--debug']
@@ -70,8 +76,23 @@ def main():
         update_study(study, config)
         return
 
-    update_tags(config, skip_delete, delete_all)
-    update_studies(config, skip_delete, delete_all)
+    update_tags(config, skip_all, accept_all)
+    update_studies(config, skip_all, accept_all)
+
+
+def prompt_user(message):
+    answer = input(message).strip().lower()
+    if answer not in ['y', 'n', '']:
+        raise RuntimeError(f"Invalid user input {answer}")
+    return answer == 'y'
+
+
+def prompt_delete(message):
+    return prompt_user(message + " Delete? (y/[n]) ")
+
+
+def prompt_update(message):
+    return prompt_user(message + " Update? (y/[n]) ")
 
 
 def update_tags(config, skip_delete=False, delete_all=False):
@@ -82,16 +103,17 @@ def update_tags(config, skip_delete=False, delete_all=False):
         return
 
     for tag in tag_settings:
-        settings = tag_settings[tag]
         db_entry = datman.dashboard.get_tags(tag, create=True)[0]
+
         try:
-            qc_type = settings['qc_type']
+            qc_type = tag_settings.get(tag, 'qc_type')
         except KeyError:
             qc_type = None
         try:
-            pha_type = settings['qc_pha']
+            pha_type = tag_settings.get(tag, 'qc_pha')
         except KeyError:
             pha_type = None
+
         db_entry.qc_type = qc_type
         db_entry.pha_type = pha_type
         db_entry.save()
@@ -100,46 +122,16 @@ def update_tags(config, skip_delete=False, delete_all=False):
     undefined = [record for record in all_tags
                  if record.tag not in tag_settings]
 
-    if undefined:
-        delete_tags(undefined, skip_delete, delete_all)
-
-
-def delete_tags(records, skip_delete=False, delete_all=False):
-    logger.debug(f"Found {len(records)} tags in database that are not "
-                 "defined in config files.")
-
-    if skip_delete:
-        logger.debug("Skipping deletion of undefined tags.")
+    if not undefined:
         return
 
-    for record in records:
-        tagged_scans = datman.dashboard.find_scans(record.tag)
-
-        if delete_all:
-            remove = True
-        else:
-            remove = prompt_user(
-                f"{record} missing from config files. If deleted, "
-                f"{len(tagged_scans)} scan records will also be removed."
-            )
-
-        if not remove:
-            logger.info(f"Skipping deletion of {record}")
-            continue
-
-        logger.info(f"Removing tag {record} and {len(tagged_scans)} scans.")
-
-        try:
-            record.delete()
-        except Exception as e:
-            logger.error(f"Failed deleting {record}. Reason - {e}")
-
-
-def prompt_user(message):
-    answer = input(message + " Delete? (y/[n]) ").strip().lower()
-    if answer not in ['y', 'n', '']:
-        raise RuntimeError(f"Invalid user input {answer}")
-    return answer == 'y'
+    delete_records(
+        undefined,
+        prompt=("Tag {} undefined. If deleted any scan records with this "
+                "tag will also be removed."),
+        skip_delete=skip_delete,
+        delete_all=delete_all
+    )
 
 
 def update_studies(config, skip_delete=False, delete_all=False):
@@ -153,39 +145,17 @@ def update_studies(config, skip_delete=False, delete_all=False):
     undefined = [study for study in all_studies
                  if study.id not in studies]
 
-    delete_studies(undefined, skip_delete, delete_all)
+    if undefined:
+        delete_records(
+            undefined,
+            prompt=("Study {} missing from config files. If deleted any "
+                    "timepoints and their contents will also be deleted."),
+            skip_delete=skip_delete,
+            delete_all=delete_all
+        )
 
     for study in studies:
         update_study(study, config, skip_delete, delete_all)
-
-
-def delete_studies(records, skip_delete=False, delete_all=False):
-    logger.debug(f"Found {len(records)} studies not defined in config files.")
-
-    if skip_delete:
-        logger.debug("Skipping deletion of undefined studies.")
-        return
-
-    for record in records:
-        if delete_all:
-            remove = True
-        else:
-            remove = prompt_user(
-                f"Study {record} missing from config files. "
-                f"{record.timepoints.count()} timepoints and their contents "
-                "will be also be deleted."
-            )
-
-        if not remove:
-            logger.info(f"Skipping deletion of {record}")
-            continue
-
-        logger.info(f"Removing study {record} and its contents.")
-
-        try:
-            record.delete()
-        except Exception as e:
-            logger.error(f"Failed deleting {record}. Reason - {e}")
 
 
 def update_study(study_id, config, skip_delete=False, delete_all=False):
@@ -197,25 +167,175 @@ def update_study(study_id, config, skip_delete=False, delete_all=False):
 
     study = datman.dashboard.get_project(study_id, create=True)
 
-    # if Description defined, update description
-    # FullName, update name
-    # if OPEN_STUDY, update is_open
+    # Metadata / study-wide settings here
+    try:
+        descr = config.get_key('Description')
+    except UndefinedSetting:
+        pass
+    else:
+        study.description = descr
 
-    # readme -> requires finding and reading file
+    try:
+        full_name = config.get_key('FullName')
+    except UndefinedSetting:
+        pass
+    else:
+        study.name = full_name
+
+    try:
+        is_open = config.get_key('IsOpen')
+    except UndefinedSetting:
+        pass
+    else:
+        study.is_open = is_open
+
+    # readme -> requires finding and reading file (db no longer updates
+    #           filesystem so likely to be more up to date)
     # PrimaryContact (need to add user + fill in study_user record?)
-    # Sites -> Add study_site record for each + add new sites
-    #       (offer to delete study_site records that don't match + cascade to scan records)
-    # Scan types -> add a scantype + study_scantype record as needed (delete study_scantype records)
-    # USES_TECHNOTES (may be study wide or site in config files, add to study_site records)
-    # STUDY_TAG -> may change by site, provide site when getting key
-    #       (alt study codes?...)
-    # Expected scans -> Add record for each tag + add counts
-    #       (offer to delete study/site/tag combos no longer found + cascade)
-    # email on trigger? Is there config val for that?
-    # USES_REDCAP -> Update study_sites records
 
-    return
+    # Site configuration from here down
+    try:
+        sites = config.get_sites()
+    except UndefinedSetting:
+        logger.error(f"No sites defined for {study_id}")
+        return
 
+    undefined = [site_id for site_id in study.sites if site_id not in sites]
+    delete_records(
+        undefined,
+        prompt=("Site {} will be deleted from study "
+                f"{study.id}. Any records referencing this study/site pair "
+                "will be removed."),
+        delete_func=lambda x: study.delete_site(x),
+        skip_delete=skip_delete,
+        delete_all=delete_all
+    )
+
+    all_tags = get_config_tags(config, sites)
+    undefined = [entry.tag for entry in study.scantypes
+                 if entry.tag not in all_tags]
+
+    # add a study_scantype record for any scan type present in any site...
+
+    for site_id in sites:
+        update_site(study, site_id, config)
+
+
+def get_config_tags(config, sites):
+    """Get all configured tags for a study.
+
+    Args:
+        config (:obj:`datman.config.config`): The configuration for a study.
+        sites (:obj:`list`): The list of sites defined by this study.
+
+    Returns:
+        [type]: [description]
+    """
+    all_tags = set()
+    for site_id in sites:
+        try:
+            site_tags = config.get_tags(site=site_id)
+        except UndefinedSetting:
+            continue
+        all_tags.update(site_tags.keys())
+    return all_tags
+
+
+def update_site(study, site_id, config, skip_delete=False, delete_all=False):
+    try:
+        code = config.get_key('STUDY_TAG', site=site_id)
+    except UndefinedSetting:
+        code = None
+
+    try:
+        rc_setting = config.get_key('USES_REDCAP', site=site_id)
+    except UndefinedSetting:
+        rc_setting = None
+
+    try:
+        notes = config.get_key('USES_TECHNOTES', site=site_id)
+    except UndefinedSetting:
+        notes = None
+
+    try:
+        study.update_site(site_id, redcap=rc_setting, notes=notes, code=code,
+                          create=True)
+    except Exception as e:
+        logger.error(f"Failed updating settings for study {study} and site "
+                     f"{site_id}. Reason - {e}")
+
+    update_expected_scans(study, site_id, config, skip_delete, delete_all)
+
+
+def update_expected_scans(study, site_id, config, skip_delete=False,
+                          delete_all=False):
+    try:
+        tag_settings = config.get_tags(site_id)
+    except UndefinedSetting:
+        logger.debug(f"No tags defined for site {site_id}. Skipping update.")
+        return
+
+    if site_id in study.expected_scans:
+        undefined = [entry for entry in study.expected_scans[site_id]
+                     if entry.scantype not in tag_settings]
+        if undefined:
+            delete_records(
+                undefined,
+                prompt="Expected scan type {} not defined in config files.",
+                skip_delete=skip_delete,
+                delete_all=delete_all
+            )
+
+    for tag in tag_settings:
+        try:
+            sub = tag_settings.get(tag, 'Count')
+        except KeyError:
+            sub = None
+
+        try:
+            pha = tag_settings.get(tag, 'PHACount')
+        except KeyError:
+            pha = None
+
+        try:
+            study.update_expected_scans(site_id, tag, num=sub, pha_num=pha)
+        except Exception as e:
+            logger.error(f"Failed to update expected scans for {study.id} "
+                         f"site {site_id} and tag {tag}. Reason - {e}")
+
+
+def delete_records(records, prompt=None, delete_func=None, skip_delete=False,
+                   delete_all=False):
+    logger.debug(f"Found {len(records)} records not defined in config files.")
+
+    if skip_delete:
+        logger.debug("Skipping deletion.")
+        return
+
+    if not prompt:
+        prompt = ("Record {} not specified by config files. If removed any "
+                  "records associated with it will also be deleted.")
+
+    if not delete_func:
+        def delete_func(x):
+            x.delete()
+
+    for record in records:
+        if delete_all:
+            remove = True
+        else:
+            remove = prompt_delete(prompt.format(record))
+
+        if not remove:
+            logger.info(f"Skipping deletiong of {record}")
+            continue
+
+        logger.info(f"Removing {record}")
+
+        try:
+            delete_func(record)
+        except Exception as e:
+            logger.error(f"Failed deleting {record}. Reason - {e}")
 
 
 if __name__ == "__main__":
