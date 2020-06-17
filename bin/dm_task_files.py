@@ -1,5 +1,9 @@
 #!/usr/bin/env python
 """
+Locates task files stored in participant resource folders. For each found
+task file a record is added to the dashboard database and a symlink is made
+in the study's task folder.
+
 Usage:
     dm_task_files.py <study>
 
