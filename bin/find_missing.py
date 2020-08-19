@@ -191,7 +191,7 @@ def check_scans(dm_exp, kcni_exp):
 
     diffs = {
         'missing': [],
-        'differ': []
+        'differ': {}
     }
 
     for series in dm_scans:
@@ -199,8 +199,7 @@ def check_scans(dm_exp, kcni_exp):
             diffs['missing'].append(series)
         elif (dm_scans[series].f_size != kcni_scans[series].f_size or
               dm_scans[series].f_count != kcni_scans[series].f_count):
-            diffs['differ'] = {
-                'series': series,
+            diffs[series] = {
                 'dm_size': dm_scans[series].f_size,
                 'kcni_size': kcni_scans[series].f_size,
                 'dm_count': dm_scans[series].f_count,
@@ -208,6 +207,60 @@ def check_scans(dm_exp, kcni_exp):
             }
 
     return diffs
+
+
+def upload_scans(dm_exp, kcni_exp, missing):
+    for series_num in missing:
+        try:
+            dicom_zip = dm_xnat.get_dicom(
+                dm_exp.project, dm_exp.subject, dm_exp.name, series_num
+            )
+        except Exception as e:
+            print(f"Failed downloading series {series_num} for {dm_exp.name}."
+                  f" Reason - {e}")
+            return
+
+        try:
+            kcni_xnat.put_dicoms(
+                kcni_exp.project, kcni_exp.subject, kcni_exp.name, dicom_zip
+            )
+        except Exception as e:
+            print(f"Failed uploading series {series_num} for {kcni_exp.name}."
+                  f" Reason - {e}")
+
+        try:
+            os.remove(dicom_zip)
+        except:
+            pass
+
+
+def upload_resources(dm_exp, kcni_exp, missing):
+    for r_id in missing:
+        for entry in missing[r_id]:
+            try:
+                source = dm_xnat.get_resource(
+                    dm_exp.project, dm_exp.subject, dm_exp.name, r_id,
+                    entry['URI']
+                )
+            except Exception as e:
+                print(f"Failed uploading resource {entry['URI']} for "
+                      f"{dm_exp.name}. Reason - {e}"
+                )
+                continue
+
+            with open(source, 'rb') as fh:
+                try:
+                    kcni_xnat.put_resource(
+                        kcni_exp.project, kcni_exp.subject, kcni_exp.name,
+                        entry['URI'], fh, 'MISC'
+                    )
+                except Exception as e:
+                    print(f"Failed uploading {entry['URI']} for {dm_exp.name}."
+                          f" Reason - {e}")
+            try:
+                os.remove(source)
+            except:
+                pass
 
 
 def main():
