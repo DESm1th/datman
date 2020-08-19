@@ -269,17 +269,14 @@ def main():
         scan_diffs = check_scans(dm_exp, kcni_exp)
         res_diffs = check_resources(dm_exp, kcni_exp)
 
-        if 'differ' in scan_diffs or 'differ' in res_diffs:
+        if scan_diffs['differ'] or res_diffs['differ']:
             diffs[exp_id] = {
-                'scans': scan_diffs['differ'] if 'differ' in scan_diffs else {},
-                'resources': res_diffs['differ'] if 'differ' in res_diffs else []
+                'scans': scan_diffs['differ'],
+                'resources': res_diffs['differ']
             }
 
-        if 'missing' in scan_diffs:
-            upload_scans(dm_exp, kcni_exp, scan_diffs['missing'])
-
-        if 'missing' in res_diffs:
-            upload_resources(dm_exp, kcni_exp, res_diffs['missing'])
+        upload_scans(dm_exp, kcni_exp, scan_diffs['missing'])
+        upload_resources(dm_exp, kcni_exp, res_diffs['missing'])
 
     if not output:
         print(f"Discovered differences: {diffs}")
