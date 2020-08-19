@@ -9,12 +9,19 @@ Args:
     <dm_project>        The name of the project on our xnat server
     <kcni_project>      The name of the project on KCNI's server
     <datman_exp>        The datman ID of a specific experiment to check
+
+Options:
+    --output <path>     The path to dump the file count differences that were
+                        found.
 """
 import os
 
 from docopt import docopt
+import yaml
 
 import datman.xnat
+import datman.config
+import datman.scanid
 
 xnat_user = os.getenv("XNAT_USER")
 xnat_pass = os.getenv("XNAT_PASS")
@@ -23,7 +30,7 @@ dm_server = "https://xnat.imaging-genetics.camh.ca"
 kcni_server = "https://xnat.camh.ca/xnat"
 
 dm_xnat = datman.xnat.xnat(dm_server, xnat_user, xnat_pass)
-# kcni_xnat = datman.xnat.xnat(kcni_server, xnat_user, xnat_pass)
+kcni_xnat = datman.xnat.xnat(kcni_server, xnat_user, xnat_pass)
 
 
 class ResourceFolder:
@@ -79,10 +86,6 @@ def get_scans(exp):
     }
 
 
-def find_missing(dm_exp, kcni_exp):
-    resource_diffs = check_resources(dm_exp, kcni_exp)
-
-
 def check_resources(dm_exp, kcni_exp):
     dm_resources = get_resources(dm_exp)
     kcni_resources = get_resources(kcni_exp)
@@ -130,59 +133,7 @@ def check_resources(dm_exp, kcni_exp):
                 if entry['URI'] not in kcni_uris:
                     diffs['missing'][dm_rid].append(entry)
 
-        elif dm_resources[folder].f_size != kcni_resources[folder].f_size:
-            entry = {
-                'folder': folder,
-                'dm_size': dm_resources[folder].f_size,
-                'kcni_size': kcni_resources[folder].f_size
-            }
-            diffs['differ'].append(entry)
-
     return diffs
-
-
-
-
-    # Find files that are the wrong size
-
-    # Download missing files
-    # report wrong sized files
-
-    # Upload missing files with correct names
-
-    # If entire folder missing.. add all contents to list
-    # if only single file missing.. add to list
-    # if file is wrong size... ??
-
-    # missing list, wrong size list
-    # missing = list of full paths to each file (include parent folders)
-    # wrong_size = list of full path + size for each server
-
-    # Write into (<src_proj>, <src_id>, <src_exp>), (<dest_proj>, <dest_id>, <dest_exp>), <full_path> (??)
-    # src_tuple, full_path (size), dest_tuple, full_path (size)
-
-    # missing {'scans': missing_scans, 'resources': missing_res}
-
-    missing = []
-    for folder in dm_resources:
-        # Check if file count is greater than 0. Some 'NO LABEL' empty folders
-        # exist on our server and shouldnt be replicated.
-        if dm_resources[folder].f_count != 0 and folder not in kcni_resources:
-            missing.append(folder)
-
-    dm_resources = dm_exp.get_resources(dm_xnat)
-    kcni_resources = kcni_exp.get_resources(kcni_xnat)
-    missing_resources = list(set(dm_resources) - set(kcni_resources))
-
-    # if missing_resources:
-        # Compare file sizes of dm_exp.resource_files[0][0]['data_fields']
-        # if data_fields['file_count'] is equal check data_fields['file_size']
-    missing = []
-    for entry in dm_exp.resource_files[0]:
-        data_fields = entry['data_fields']
-        label = data_fields['label']
-        f_size = data_fields['file_size']
-        f_count = data_fields['file_count']
 
 
 def check_scans(dm_exp, kcni_exp):
@@ -197,11 +148,8 @@ def check_scans(dm_exp, kcni_exp):
     for series in dm_scans:
         if series not in kcni_scans:
             diffs['missing'].append(series)
-        elif (dm_scans[series].f_size != kcni_scans[series].f_size or
-              dm_scans[series].f_count != kcni_scans[series].f_count):
+        elif dm_scans[series].f_count != kcni_scans[series].f_count:
             diffs[series] = {
-                'dm_size': dm_scans[series].f_size,
-                'kcni_size': kcni_scans[series].f_size,
                 'dm_count': dm_scans[series].f_count,
                 'kcni_count': kcni_scans[series].f_count
             }
@@ -265,6 +213,82 @@ def upload_resources(dm_exp, kcni_exp, missing):
 
 def main():
     arguments = docopt(__doc__)
+    dm_project = arguments['<dm_project>']
+    kcni_project = arguments['<kcni_project>']
+    dm_exp = arguments['<datman_exp>']
+    output = arguments['--output']
+
+    config = datman.config.config(study=dm_project)
+    try:
+        id_map = config.get_key('ID_MAP')
+    except:
+        id_map = None
+
+    if dm_exp:
+        experiments = [dm_exp]
+    else:
+        experiments = dm_xnat.get_experiment_ids(dm_project)
+
+    diffs = {}
+
+    for exp_id in experiments:
+        try:
+            dm_ident = datman.scanid.parse(exp_id)
+        except datman.scanid.ParseException:
+            print(f"Failed to parse experiment ID {exp_id}. Ignoring.")
+            continue
+
+        try:
+            kcni_ident = datman.scanid.parse(exp_id, id_map)
+        except datman.scanid.ParseException:
+            print(f"Failed to parse ID {exp_id} into KCNI ID. Ignoring.")
+            continue
+
+        try:
+            dm_exp = dm_xnat.get_experiment(
+                dm_project,
+                dm_ident.get_xnat_subject_id(),
+                dm_ident.get_xnat_experiment_id()
+            )
+        except Exception:
+            print(f"Couldnt find datman xnat experiment {exp_id}")
+            continue
+
+        try:
+            kcni_exp = kcni_xnat.get_experiment(
+                kcni_project,
+                kcni_ident.get_xnat_subject_id(),
+                kcni_ident.get_xnat_experiment_id()
+            )
+        except Exception:
+            print(f"Couldnt find kcni xnat experiment for {kcni_ident.orig_id}")
+            continue
+
+        scan_diffs = check_scans(dm_exp, kcni_exp)
+        res_diffs = check_resources(dm_exp, kcni_exp)
+
+        if 'differ' in scan_diffs or 'differ' in res_diffs:
+            diffs[exp_id] = {
+                'scans': scan_diffs['differ'] if 'differ' in scan_diffs else {},
+                'resources': res_diffs['differ'] if 'differ' in res_diffs else []
+            }
+
+        if 'missing' in scan_diffs:
+            upload_scans(dm_exp, kcni_exp, scan_diffs['missing'])
+
+        if 'missing' in res_diffs:
+            upload_resources(dm_exp, kcni_exp, res_diffs['missing'])
+
+    if not output:
+        print(f"Discovered differences: {diffs}")
+        return
+
+    if not diffs:
+        return
+
+    with open(output, 'w') as fh:
+        yaml.dump(diffs, fh)
+
 
 if __name__ == "__main__":
     main()
