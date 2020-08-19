@@ -2,10 +2,11 @@
 """Report files missing from KCNI server.
 
 Usage:
-    find_missing.py [options] <dm_project> <kcni_project>
-    find_missing.py [options] <dm_project> <kcni_project> <datman_exp>
+    find_missing.py [options] <study> <dm_project> <kcni_project>
+    find_missing.py [options] <study> <dm_project> <kcni_project> <datman_exp>
 
 Args:
+    <study>             The canonical name of the study (as in the archive)
     <dm_project>        The name of the project on our xnat server
     <kcni_project>      The name of the project on KCNI's server
     <datman_exp>        The datman ID of a specific experiment to check
@@ -213,12 +214,13 @@ def upload_resources(dm_exp, kcni_exp, missing):
 
 def main():
     arguments = docopt(__doc__)
+    study = arguments['<study>']
     dm_project = arguments['<dm_project>']
     kcni_project = arguments['<kcni_project>']
     dm_exp = arguments['<datman_exp>']
     output = arguments['--output']
 
-    config = datman.config.config(study=dm_project)
+    config = datman.config.config(study=study)
     try:
         id_map = config.get_key('ID_MAP')
     except:
