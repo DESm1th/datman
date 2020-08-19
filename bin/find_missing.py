@@ -241,7 +241,7 @@ def main():
             continue
 
         try:
-            kcni_ident = datman.scanid.parse(exp_id, id_map)
+            kcni_ident = datman.scanid.get_kcni_identifier(exp_id, id_map)
         except datman.scanid.ParseException:
             print(f"Failed to parse ID {exp_id} into KCNI ID. Ignoring.")
             continue
