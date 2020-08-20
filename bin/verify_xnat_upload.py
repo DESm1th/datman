@@ -2,8 +2,8 @@
 """Report files missing from KCNI server.
 
 Usage:
-    find_missing.py [options] <study> <dm_project> <kcni_project>
-    find_missing.py [options] <study> <dm_project> <kcni_project> <datman_exp>
+    verify_xnat_upload.py [options] <study> <dm_project> <kcni_project>
+    verify_xnat_upload.py [options] <study> <dm_project> <kcni_project> <datman_exp>
 
 Args:
     <study>             The canonical name of the study (as in the archive)
