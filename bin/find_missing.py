@@ -1,4 +1,4 @@
-#!/bin/bash
+#!/usr/bin/env python
 """Report files missing from KCNI server.
 
 Usage:
@@ -197,11 +197,13 @@ def upload_resources(dm_exp, kcni_exp, missing):
                 )
                 continue
 
+            folder_name = os.path.dirname(entry['ID'])
+
             with open(source, 'rb') as fh:
                 try:
                     kcni_xnat.put_resource(
                         kcni_exp.project, kcni_exp.subject, kcni_exp.name,
-                        entry['URI'], fh, 'MISC'
+                        entry['URI'], fh, folder_name
                     )
                 except Exception as e:
                     print(f"Failed uploading {entry['URI']} for {dm_exp.name}."
