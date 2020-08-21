@@ -271,7 +271,11 @@ class xnat(object):
             projects = [p["ID"] for p in self.get_projects()]
 
         for project in projects:
-            if subject_id in self.get_subject_ids(project):
+            try:
+                found_ids = self.get_subject_ids(project)
+            except XnatException:
+                continue
+            if subject_id in found_ids:
                 logger.debug(f"Found session {subject_id} in project {project}")
                 return project
 
@@ -1189,6 +1193,8 @@ class xnat(object):
             url, headers=headers, data=data, timeout=60 * 60
         )
 
+        reply = str(response.content)
+
         if response.status_code == 401:
             # possibly the session has timed out
             logger.info("Session may have expired, resetting")
@@ -1205,23 +1211,20 @@ class xnat(object):
                 response.raise_for_status()
 
         elif response.status_code != 200:
-            if "multiple imaging sessions." in response.content:
-                raise XnatException(
-                    "Multiple imaging sessions in archive, check prearchive"
-                )
-            if "502 Bad Gateway" in response.content:
+            if "multiple imaging sessions." in reply:
+                raise XnatException("Multiple imaging sessions in archive,"
+                                    " check prearchive")
+            if "502 Bad Gateway" in reply:
                 raise XnatException("Bad gateway error: Check tomcat logs")
-            if "Unable to identify experiment" in response.content:
-                raise XnatException(
-                    "Unable to identify experiment, did dicom upload fail?"
-                )
+            if "Unable to identify experiment" in reply:
+                raise XnatException("Unable to identify experiment, did "
+                                    "dicom upload fail?")
             else:
-                raise XnatException(
-                    "An unknown error occurred uploading data."
-                    f"Status code: {response.status_code}, "
-                    f"reason: {response.content}"
-                )
-        return response.content
+                raise XnatException("An unknown error occured uploading data."
+                                    "Status code: {}, reason: {}"
+                                    .format(response.status_code,
+                                            reply))
+        return reply
 
     def _make_xnat_delete(self, url, retries=3):
         try:
@@ -1523,9 +1526,6 @@ class XNATExperiment(XNATObject):
                 set the zip name will be session.name
 
         """
-        if not self.experiment:
-            raise ValueError(f"No data found for {self.name}")
-
         resources_list = list(self.scan_resource_IDs)
         resources_list.extend(self.misc_resource_IDs)
         resources_list.extend(self.resource_IDs)

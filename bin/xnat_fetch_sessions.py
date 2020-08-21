@@ -126,12 +126,12 @@ def download_subjects(xnat, xnat_project, destination):
 
         if not exp_names:
             logger.error("Subject {} has no experiments.".format(subject.name))
-            return
+            continue
 
         if len(exp_names) > 1:
             logger.error("Found {} experiments for subject {}".format(
                 len(exp_names), subject.name))
-            return
+            continue
 
         experiment = subject.experiments[exp_names[0]]
 
@@ -147,7 +147,7 @@ def download_subjects(xnat, xnat_project, destination):
             logger.info("Would have downloaded experiment {} from project "
                         "{} to {}".format(
                             experiment.name, xnat_project, zip_path))
-            return
+            continue
 
         with datman.utils.make_temp_directory() as temp:
             try:
