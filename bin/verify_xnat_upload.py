@@ -42,8 +42,14 @@ class ResourceFolder:
             self.label = xnat_entry['data_fields']['label']
         except KeyError:
             self.label = 'NOLABEL'
-        self.f_size = xnat_entry['data_fields']['file_size']
-        self.f_count = xnat_entry['data_fields']['file_count']
+        try:
+            self.f_size = xnat_entry['data_fields']['file_size']
+        except KeyError:
+            self.f_size = 0
+        try:
+            self.f_count = xnat_entry['data_fields']['file_count']
+        except KeyError:
+            self.f_count = 0
 
     def __repr__(self):
         return f"<ResourceFolder: {self.label}>"
