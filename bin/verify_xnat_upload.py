@@ -16,6 +16,7 @@ Options:
                         found.
 """
 import os
+import urllib
 
 from docopt import docopt
 import yaml
@@ -204,12 +205,16 @@ def upload_resources(dm_exp, kcni_exp, missing):
                 continue
 
             folder_name = os.path.dirname(entry['ID'])
+            unquoted = urllib.parse.unquote(entry['URI'])
+
+            if unquoted != entry['URI']:
+                print(f"File name changed from {entry['URI']} to {unquoted}")
 
             with open(source, 'rb') as fh:
                 try:
                     kcni_xnat.put_resource(
                         kcni_exp.project, kcni_exp.subject, kcni_exp.name,
-                        entry['URI'], fh, folder_name
+                        unquoted, fh, folder_name
                     )
                 except Exception as e:
                     print(f"Failed uploading {entry['URI']} for {dm_exp.name}."
