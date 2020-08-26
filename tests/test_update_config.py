@@ -171,3 +171,76 @@ class TestDeleteRecords:
         for _ in range(4):
             records.append(Mock())
         return records
+
+
+class TestUpdateExpectedScans:
+
+    def test_no_crash_if_site_undefined_in_config(self):
+        config = self.get_config()
+        uc.update_expected_scans(Mock(), 'BADSITE', config)
+
+    def test_no_crash_if_no_scans_defined_for_site(self):
+        mock_study = Mock()
+        mock_study.scantypes = {}
+        config = self.get_config()
+        uc.update_expected_scans(mock_study, 'NOSCANS', config)
+
+    def test_no_scantypes_added_if_none_defined_in_config(self):
+        mock_study = Mock()
+        mock_study.scantypes = {}
+        config = self.get_config()
+        uc.update_expected_scans(mock_study, 'NOSCANS', config)
+        assert mock_study.update_scantype.call_count == 0
+
+    @patch('bin.update_config.delete_records')
+    def test_attempts_to_delete_database_scantypes_if_not_in_config(self,
+            mock_delete):
+        mock_study = Mock()
+        mock_t1 = Mock()
+        mock_t1.scantype_id = 'T1'
+        mock_t2 = Mock()
+        mock_t2.scantype_id = 'T2'
+        mock_study.scantypes = {
+            'SITE': [mock_t1, mock_t2]
+        }
+        config = self.get_config()
+
+        uc.update_expected_scans(mock_study, 'SITE', config)
+        assert mock_delete.call_count == 1
+        assert mock_delete.call_args_list[0].args[0][0] == mock_t2
+
+    def test_expected_tags_updated_in_database(self):
+        mock_t1 = Mock()
+        mock_t1.scantype_id = 'T1'
+        mock_study = Mock()
+        mock_study.scantypes = {
+            'SITE': [mock_t1]
+        }
+        config = self.get_config()
+
+        uc.update_expected_scans(mock_study, 'SITE', config)
+        assert mock_study.update_scantype.call_count == 1
+        assert mock_study.update_scantype.call_args_list[0][0][1] == 'T1'
+
+    def get_config(self):
+        tag_settings = {
+            'T1': {
+                'formats': ['nii', 'dcm', 'mnc'],
+                'qc_type': 'anat',
+                'bids': {'class': 'anat', 'modality_label': 'T1w'},
+                'Pattern': {'SeriesDescription': ['T1', 'BRAVO']},
+                'Count': 1
+            }
+        }
+
+        def get_tags(name):
+            if name == 'SITE':
+                return datman.config.TagInfo(tag_settings)
+            if name == 'NOSCANS':
+                return datman.config.TagInfo({})
+            raise datman.config.UndefinedSetting
+
+        config = Mock(spec=datman.config.config)
+        config.get_tags.side_effect = get_tags
+
+        return config
