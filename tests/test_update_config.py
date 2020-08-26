@@ -112,3 +112,62 @@ class TestUpdateTags:
 
             return found
         return get_tag
+
+
+class TestDeleteRecords:
+
+    def test_nothing_deleted_when_skip_delete_flag_set(self):
+        records = self.get_mock_records()
+        uc.delete_records(records, skip_delete=True)
+        for item in records:
+            assert item.delete.call_count == 0
+
+    def test_all_given_records_deleted_when_delete_all_set(self):
+        records = self.get_mock_records()
+        uc.delete_records(records, delete_all=True)
+        for item in records:
+            assert item.delete.call_count == 1
+
+    @patch('builtins.input')
+    def test_delete_func_used_to_delete_when_provided(self, mock_input):
+        mock_input.return_value = 'y'
+        def delete_func(x):
+            x.alt_delete()
+        records = self.get_mock_records()
+        uc.delete_records(records, delete_func=delete_func)
+
+        for item in records:
+            assert item.delete.call_count == 0
+
+        for item in records:
+            assert item.alt_delete.call_count == 1
+
+    @patch('builtins.input')
+    @patch('bin.update_config.prompt_user')
+    def test_prompt_changed_when_flag_set(self, mock_prompt, mock_input):
+        mock_input.return_value = 'y'
+        records = self.get_mock_records()
+
+        message = 'Testing prompt flag'
+        uc.delete_records(records, prompt=message)
+        for call in mock_prompt.call_args_list:
+            assert message in call.args[0]
+
+    @patch('builtins.input')
+    def test_records_only_deleted_when_user_consents(self, mock_input):
+        responses = ['n', 'n', 'y', 'n']
+        mock_input.side_effect = lambda x: responses.pop()
+        records = self.get_mock_records()
+
+        uc.delete_records(records)
+
+        assert records[0].delete.call_count == 0
+        assert records[1].delete.call_count == 1
+        assert records[2].delete.call_count == 0
+        assert records[3].delete.call_count == 0
+
+    def get_mock_records(self):
+        records = []
+        for _ in range(4):
+            records.append(Mock())
+        return records
