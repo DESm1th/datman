@@ -80,6 +80,40 @@ def main():
     update_studies(config, skip_all, accept_all)
 
 
+def delete_records(records, prompt=None, delete_func=None, skip_delete=False,
+                   delete_all=False):
+    logger.debug(f"Found {len(records)} records not defined in config files.")
+
+    if skip_delete:
+        logger.debug("Skipping deletion.")
+        return
+
+    if not prompt:
+        prompt = ("Record {} not specified by config files. If removed any "
+                  "records associated with it will also be deleted.")
+
+    if not delete_func:
+        def delete_func(x):
+            x.delete()
+
+    for record in records:
+        if delete_all:
+            remove = True
+        else:
+            remove = prompt_delete(prompt.format(record))
+
+        if not remove:
+            logger.info(f"Skipping deletiong of {record}")
+            continue
+
+        logger.info(f"Removing {record}")
+
+        try:
+            delete_func(record)
+        except Exception as e:
+            logger.error(f"Failed deleting {record}. Reason - {e}")
+
+
 def prompt_user(message):
     answer = input(message).strip().lower()
     if answer not in ['y', 'n', '']:
@@ -91,71 +125,28 @@ def prompt_delete(message):
     return prompt_user(message + " Delete? (y/[n]) ")
 
 
-def prompt_update(message):
-    return prompt_user(message + " Update? (y/[n]) ")
+# def prompt_update(message):
+#     return prompt_user(message + " Update? (y/[n]) ")
 
 
-def update_tags(config, skip_delete=False, delete_all=False):
-    try:
-        tag_settings = config.get_key('ExportSettings')
-    except UndefinedSetting:
-        logger.info('No defined tags found, skipping tag update.')
-        return
+def get_config_tags(config, sites):
+    """Get all configured tags for a study.
 
-    for tag in tag_settings:
-        db_entry = datman.dashboard.get_tags(tag, create=True)[0]
+    Args:
+        config (:obj:`datman.config.config`): The configuration for a study.
+        sites (:obj:`list`): The list of sites defined by this study.
 
+    Returns:
+        :obj:`set`: The set of all tags configured for a study
+    """
+    all_tags = set()
+    for site_id in sites:
         try:
-            qc_type = tag_settings[tag]['qc_type']
-        except KeyError:
-            qc_type = None
-        try:
-            pha_type = tag_settings[tag]['qc_pha']
-        except KeyError:
-            pha_type = None
-
-        db_entry.qc_type = qc_type
-        db_entry.pha_type = pha_type
-        db_entry.save()
-
-    all_tags = datman.dashboard.get_tags()
-    undefined = [record for record in all_tags
-                 if record.tag not in tag_settings]
-
-    if not undefined:
-        return
-
-    delete_records(
-        undefined,
-        prompt=("Tag {} undefined. If deleted any scan records with this "
-                "tag will also be removed."),
-        skip_delete=skip_delete,
-        delete_all=delete_all
-    )
-
-
-def update_studies(config, skip_delete=False, delete_all=False):
-    try:
-        studies = config.get_key('Projects').keys()
-    except UndefinedSetting:
-        logger.debug('No configured projects detected.')
-        return
-
-    all_studies = datman.dashboard.get_projects()
-    undefined = [study for study in all_studies
-                 if study.id not in studies]
-
-    if undefined:
-        delete_records(
-            undefined,
-            prompt=("Study {} missing from config files. If deleted any "
-                    "timepoints and their contents will also be deleted."),
-            skip_delete=skip_delete,
-            delete_all=delete_all
-        )
-
-    for study in studies:
-        update_study(study, config, skip_delete, delete_all)
+            site_tags = config.get_tags(site=site_id)
+        except UndefinedSetting:
+            continue
+        all_tags.update(site_tags.keys())
+    return all_tags
 
 
 def update_study(study_id, config, skip_delete=False, delete_all=False):
@@ -221,26 +212,6 @@ def update_study(study_id, config, skip_delete=False, delete_all=False):
         update_site(study, site_id, config)
 
 
-def get_config_tags(config, sites):
-    """Get all configured tags for a study.
-
-    Args:
-        config (:obj:`datman.config.config`): The configuration for a study.
-        sites (:obj:`list`): The list of sites defined by this study.
-
-    Returns:
-        [type]: [description]
-    """
-    all_tags = set()
-    for site_id in sites:
-        try:
-            site_tags = config.get_tags(site=site_id)
-        except UndefinedSetting:
-            continue
-        all_tags.update(site_tags.keys())
-    return all_tags
-
-
 def update_site(study, site_id, config, skip_delete=False, delete_all=False):
     try:
         code = config.get_key('STUDY_TAG', site=site_id)
@@ -304,38 +275,67 @@ def update_expected_scans(study, site_id, config, skip_delete=False,
                          f"site {site_id} and tag {tag}. Reason - {e}")
 
 
-def delete_records(records, prompt=None, delete_func=None, skip_delete=False,
-                   delete_all=False):
-    logger.debug(f"Found {len(records)} records not defined in config files.")
-
-    if skip_delete:
-        logger.debug("Skipping deletion.")
+def update_tags(config, skip_delete=False, delete_all=False):
+    try:
+        tag_settings = config.get_key('ExportSettings')
+    except UndefinedSetting:
+        logger.info('No defined tags found, skipping tag update.')
         return
 
-    if not prompt:
-        prompt = ("Record {} not specified by config files. If removed any "
-                  "records associated with it will also be deleted.")
-
-    if not delete_func:
-        def delete_func(x):
-            x.delete()
-
-    for record in records:
-        if delete_all:
-            remove = True
-        else:
-            remove = prompt_delete(prompt.format(record))
-
-        if not remove:
-            logger.info(f"Skipping deletiong of {record}")
-            continue
-
-        logger.info(f"Removing {record}")
+    for tag in tag_settings:
+        db_entry = datman.dashboard.get_tags(tag, create=True)[0]
 
         try:
-            delete_func(record)
-        except Exception as e:
-            logger.error(f"Failed deleting {record}. Reason - {e}")
+            qc_type = tag_settings[tag]['qc_type']
+        except KeyError:
+            qc_type = None
+        try:
+            pha_type = tag_settings[tag]['qc_pha']
+        except KeyError:
+            pha_type = None
+
+        db_entry.qc_type = qc_type
+        db_entry.pha_type = pha_type
+        db_entry.save()
+
+    all_tags = datman.dashboard.get_tags()
+    undefined = [record for record in all_tags
+                 if record.tag not in tag_settings]
+
+    if not undefined:
+        return
+
+    delete_records(
+        undefined,
+        prompt=("Tag {} undefined. If deleted any scan records with this "
+                "tag will also be removed."),
+        skip_delete=skip_delete,
+        delete_all=delete_all
+    )
+
+
+def update_studies(config, skip_delete=False, delete_all=False):
+    try:
+        studies = config.get_key('Projects').keys()
+    except UndefinedSetting:
+        logger.debug('No configured projects detected.')
+        return
+
+    all_studies = datman.dashboard.get_projects()
+    undefined = [study for study in all_studies
+                 if study.id not in studies]
+
+    if undefined:
+        delete_records(
+            undefined,
+            prompt=("Study {} missing from config files. If deleted any "
+                    "timepoints and their contents will also be deleted."),
+            skip_delete=skip_delete,
+            delete_all=delete_all
+        )
+
+    for study in studies:
+        update_study(study, config, skip_delete, delete_all)
 
 
 if __name__ == "__main__":
