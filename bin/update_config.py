@@ -129,26 +129,6 @@ def prompt_delete(message):
 #     return prompt_user(message + " Update? (y/[n]) ")
 
 
-def get_config_tags(config, sites):
-    """Get all configured tags for a study.
-
-    Args:
-        config (:obj:`datman.config.config`): The configuration for a study.
-        sites (:obj:`list`): The list of sites defined by this study.
-
-    Returns:
-        :obj:`set`: The set of all tags configured for a study
-    """
-    all_tags = set()
-    for site_id in sites:
-        try:
-            site_tags = config.get_tags(site=site_id)
-        except UndefinedSetting:
-            continue
-        all_tags.update(site_tags.keys())
-    return all_tags
-
-
 def update_study(study_id, config, skip_delete=False, delete_all=False):
     try:
         config.set_study(study_id)
@@ -202,12 +182,6 @@ def update_study(study_id, config, skip_delete=False, delete_all=False):
         delete_all=delete_all
     )
 
-    all_tags = get_config_tags(config, sites)
-    undefined = [entry.tag for entry in study.scantypes
-                 if entry.tag not in all_tags]
-
-    # add a study_scantype record for any scan type present in any site...
-
     for site_id in sites:
         update_site(study, site_id, config)
 
@@ -240,15 +214,27 @@ def update_site(study, site_id, config, skip_delete=False, delete_all=False):
 
 def update_expected_scans(study, site_id, config, skip_delete=False,
                           delete_all=False):
+    """Update number and type of expected scans for a site.
+
+    Args:
+        study (:obj:`dashboard.dashboard.models.Study`): A study from the
+            database.
+        site_id (:obj:`str`): The name of a site configured for the study.
+        config (:obj:`datman.config.config`): A config instance for the study.
+        skip_delete (bool, optional): Don't prompt the user and skip deletion
+            of any scan records no longer in the config files.
+        delete_all (bool, optional): Don't prompt the user and delete any
+            scan records no longer in the config files.
+    """
     try:
         tag_settings = config.get_tags(site_id)
     except UndefinedSetting:
         logger.debug(f"No tags defined for site {site_id}. Skipping update.")
         return
 
-    if site_id in study.expected_scans:
-        undefined = [entry for entry in study.expected_scans[site_id]
-                     if entry.scantype not in tag_settings]
+    if site_id in study.scantypes:
+        undefined = [entry for entry in study.scantypes[site_id]
+                     if entry.scantype_id not in tag_settings]
         if undefined:
             delete_records(
                 undefined,
@@ -269,10 +255,12 @@ def update_expected_scans(study, site_id, config, skip_delete=False,
             pha = None
 
         try:
-            study.update_expected_scans(site_id, tag, num=sub, pha_num=pha)
+            study.update_scantype(
+                site_id, tag, num=sub, pha_num=pha, create=True
+            )
         except Exception as e:
             logger.error(f"Failed to update expected scans for {study.id} "
-                         f"site {site_id} and tag {tag}. Reason - {e}")
+                         f"site {site_id} and tag {tag}. Reason - {e}.")
 
 
 def update_tags(config, skip_delete=False, delete_all=False):
