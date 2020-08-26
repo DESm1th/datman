@@ -106,11 +106,11 @@ def update_tags(config, skip_delete=False, delete_all=False):
         db_entry = datman.dashboard.get_tags(tag, create=True)[0]
 
         try:
-            qc_type = tag_settings.get(tag, 'qc_type')
+            qc_type = tag_settings[tag]['qc_type']
         except KeyError:
             qc_type = None
         try:
-            pha_type = tag_settings.get(tag, 'qc_pha')
+            pha_type = tag_settings[tag]['qc_pha']
         except KeyError:
             pha_type = None
 

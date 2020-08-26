@@ -81,16 +81,14 @@ class TestUpdateTags:
         assert mock_delete.call_args[0] == ([bad_tag],)
 
     def get_config(self):
-        export_settings = {
-            'T1': {
-                'formats': ['nii', 'dcm', 'mnc'],
-                'qc_type': 'anat'
-            },
-        }
-
         def get_key(name):
             if name == 'ExportSettings':
-                return datman.config.TagInfo(export_settings)
+                return {
+                            'T1': {
+                                'formats': ['nii', 'dcm', 'mnc'],
+                                'qc_type': 'anat'
+                            },
+                        }
             raise datman.config.UndefinedSetting
 
         config = Mock(spec=datman.config.config)
