@@ -209,7 +209,7 @@ class MetricDTI(Metric):
         super().__init__(nii_input, output_dir)
 
 
-class Ignore(Metric):
+class IgnoreMetrics(Metric):
     outputs = {}
 
     def exists(self):
