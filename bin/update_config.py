@@ -183,7 +183,13 @@ def update_study(study_id, config, skip_delete=False, delete_all=False):
     )
 
     for site_id in sites:
-        update_site(study, site_id, config)
+        update_site(
+            study,
+            site_id,
+            config,
+            skip_delete=skip_delete,
+            delete_all=delete_all
+        )
 
 
 def update_site(study, site_id, config, skip_delete=False, delete_all=False):
