@@ -369,12 +369,11 @@ def process_resources(xnat, ident, xnat_experiment):
 
     if not db_ignore:
         session = dashboard.get_session(ident)
-        if not session.expects_notes():
+        if session.tech_notes or not session.expects_notes():
             return
         notes = datman.utils.find_tech_notes(base_path)
-        if notes != session.tech_notes:
-            session.tech_notes = notes
-            session.save()
+        session.tech_notes = notes
+        session.save()
 
 
 def download_resource(xnat, xnat_experiment, xnat_resource_id,
