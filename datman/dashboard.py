@@ -167,9 +167,8 @@ def add_subject(name):
         raise DashboardException("Can't identify study for {}. {} matching "
                                  "records found for that study / site "
                                  "combination".format(name, len(studies)))
-    study = studies[0].study
 
-    return study.add_timepoint(name)
+    return studies[0].add_timepoint(name)
 
 
 @dashboard_required
@@ -274,8 +273,8 @@ def add_scan(name, tag=None, series=None, description=None, source_id=None):
         raise DashboardException("Can't identify study to add scan {} to. {} "
                                  "matches found.".format(scan_name,
                                                          len(studies)))
-    study = studies[0].study
-    allowed_tags = [st.tag for st in study.scantypes]
+    study = studies[0]
+    allowed_tags = [tags.scantype_id for tags in study.scantypes[name.site]]
 
     if tag not in allowed_tags:
         raise DashboardException("Scan name {} contains tag not configured "
@@ -305,8 +304,6 @@ def get_project(name=None, tag=None, site=None, create=False):
     if len(studies) > 1:
         raise DashboardException("{} does not uniquely identify "
                                  "a project".format(search_term))
-    if not name:
-        return studies[0].study
     return studies[0]
 
 
