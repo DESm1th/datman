@@ -80,7 +80,7 @@ class Metric(ABC):
             except KeyError:
                 found = [command]
             requires.extend(found)
-        return requires
+        return list(set(requires))
 
     def is_runnable(self):
         requires = self.get_requirements()

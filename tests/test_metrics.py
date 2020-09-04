@@ -93,6 +93,23 @@ class TestMetric:
         anat = datman.metrics.AnatMetrics(self.nii_input, self.output_dir)
         assert anat.is_runnable()
 
+    def test_get_requirements_doesnt_duplicate_requred_commands(self):
+        class MockMetric(datman.metrics.Metric):
+            outputs = {
+                "montage": {"_montage.png": None},
+                "images": {"_b0.png": None},
+                "qc_func_1": {"_output1.csv": None},
+                "slicer": {"output2.csv": None},
+                "qc_func_2": {"output3.csv": None}
+            }
+            def generate(self):
+                return
+
+        metric = MockMetric("/some/path/nifti.nii.gz", "/some/path/qc")
+        expected = sorted(["slicer", "qc_func_1", "qc_func_2", "pngappend"])
+
+        assert sorted(metric.get_requirements()) == expected
+
     @patch("datman.metrics.run")
     @patch("os.path.exists")
     def test_run_raises_exception_if_outputs_not_found_after_command_run(
