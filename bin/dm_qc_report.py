@@ -128,38 +128,63 @@ def generate_subject_qc(subject, config):
     # What if missing or database not accessible (template in assets)?
     db_subject = datman.dashboard.get_subject(subject.full_id)
 
-    ##############################################################
-    # header-qc (run_header_qc(subject, config))
     # How to determine when header diffs needs to re-run if gs changes?
     check_headers(db_subject, config)
 
+    if subject.is_phantom:
+        handlers = PHA_QC_FUNC
+    else:
+        handlers = QC_FUNC
 
-    # This could probably be removed, but double check no functionality lost
-    # expected_files = find_expected_files
+    # Remember to use Metric.exists() when determining whether to submit job...
 
-    # Is this needed if we're going database only? (probably not)
+    for nii in subject.niftis:
+        db_scan = datman.dashboard.get_scan(nii.file_name)
+        if not db_scan:
+            ############ Maybe just add it here instead? File exists.
+            logger.error(f"Can't add QC metrics for {nii.file_name}. "
+                         "Database record doesn't exist for scan.")
+            continue
+
+        # Ensure doesnt run every time...
+        add_scan_lengths(nii, db_scan)
+
+        try:
+            metric = handlers[db_scan.qc_type](nii.path, subject.qc_path)
+        except Exception as e:
+            logger.error(f"Failed to generate metrics for {nii.file_name}. "
+                         f"Reason - {e}")
+            return
+
+        # Might want to check all are runnable before running anything / submitting job
+        if not metric.is_runnable():
+            logger.error(f"Can't generate QC metrics for {nii.file_name}. "
+                         "Software pre-requisites missing. Check all commands "
+                         f"are available: {metric.get_requirements()}")
+            return
+
+        metric.generate()
+        metric.write_manifest(overwrite=REWRITE)
+
+
+def add_scan_lengths(nii, db_scan):
+    """
+    ******************** DOC STR ******************************
+    """
     try:
-        datman.utils.update_checklist({str(subject): ""}, config=config)
+        data = nib.load(nii.path)
     except Exception:
-        logger.error("Error adding {} to checklist".format(subject.full_id))
+        logger.debug(f"Failed to read scan length for {nii.path}. Reason "
+                     f"- {e}")
+        return
 
-    # generate_qc_report
-    #   write_report_header (useless now)
-    #   write_table (holds scan length code, otherwise useless)
-    #   write_tech_notes_link (need the finding / checking code)
+    try:
+        length = data.shape[3]
+    except IndexError:
+        return
 
-
-    #   write_report_body (runs the qc generation)
-    #       adds the 'bookmark' to jump from header to images
-    #       logs error if tag is wrong (is this needed? wont export catch?)
-    #       grabs qc_type (offer chance to override with pha_type for phas)
-    #       add header_diffs to page
-    #       get_series_to_add -> are PDT2s always split now? Does it matter?
-    #       generate the metrics
-
-    # update_dashboard
-    #   add static page path
-    #   update last_qc_repeat_generated
+    db_scan.length = length
+    db_scan.save()
 
 
 def random_str(n):
@@ -607,18 +632,6 @@ def generate_qc_report(report_name, subject, expected_files, header_diffs,
                               subject.resource_path)
         write_report_body(report, expected_files, subject, header_diffs,
                           tag_settings)
-
-    update_dashboard(subject, report_name, header_diffs)
-
-
-def update_dashboard(subject, report_name, header_diffs):
-    db_subject = datman.dashboard.get_subject(subject.full_id)
-    if not db_subject:
-        return
-
-    db_subject.last_qc_repeat_generated = len(db_subject.sessions)
-    db_subject.static_page = report_name
-    db_subject.save()
 
 
 def get_position(position_info):
@@ -1141,6 +1154,15 @@ def main():
     study = arguments['<study>']
     session = arguments['<session>']
     REWRITE = arguments['--rewrite']
+
+    # if not dashboard.dash_found:
+    #   logger.error
+    #   DB_IGNORE = True
+
+    # if DB_IGNORE:
+    #   do_local_qc
+    # else:
+    #   do_qc
 
     config = get_config(study)
 
