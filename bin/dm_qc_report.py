@@ -772,16 +772,16 @@ def check_headers(db_subject, config):
     ******************* doc string ***************************
     """
     try:
-        ignored_headers = config.get_key("IgnoreHeaderFields",
+        ignored_fields = config.get_key("IgnoreHeaderFields",
                                          site=db_subject.site.name)
     except datman.config.UndefinedSetting:
         ignored_fields = []
 
     try:
-        header_tolerances = config.get_key("HeaderFieldTolerance",
+        field_tolerances = config.get_key("HeaderFieldTolerance",
                                            site=db_subject.site.name)
     except datman.config.UndefinedSetting:
-        header_tolerances = {}
+        field_tolerances = {}
 
     for sess_num in db_subject.sessions:
         for series in db_subject.sessions[sess_num].scans:
@@ -791,7 +791,7 @@ def check_headers(db_subject, config):
             try:
                 series.update_header_diffs(
                     ignore=ignored_fields,
-                    tolerance=header_tolerances
+                    tolerance=field_tolerances
                 )
             except Exception as e:
                 logger.error(
