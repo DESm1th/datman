@@ -93,9 +93,9 @@ import datman.scanid
 import datman.scan
 import datman.dashboard
 import datman.header_checks as header_checks
-from dashboard.metrics import (DTIMetrics, AnatMetrics, FMRIMetrics,
-                               DTIPHAMetrics, AnatPHAMetrics, FMRIPHAMetrics,
-                               QAPHAMetrics, ABCDPHAMetrics, IgnoreMetrics)
+from datman.metrics import (DTIMetrics, AnatMetrics, FMRIMetrics,
+                            DTIPHAMetrics, AnatPHAMetrics, FMRIPHAMetrics,
+                            QAPHAMetrics, ABCDPHAMetrics, IgnoreMetrics)
 
 logging.basicConfig(level=logging.WARN,
                     format="[%(name)s] %(levelname)s: %(message)s")
@@ -773,13 +773,13 @@ def check_headers(db_subject, config):
     """
     try:
         ignored_headers = config.get_key("IgnoreHeaderFields",
-                                         site=subject.site)
+                                         site=db_subject.site.name)
     except datman.config.UndefinedSetting:
         ignored_fields = []
 
     try:
         header_tolerances = config.get_key("HeaderFieldTolerance",
-                                           site=subject.site)
+                                           site=db_subject.site.name)
     except datman.config.UndefinedSetting:
         header_tolerances = {}
 
