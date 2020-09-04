@@ -221,7 +221,7 @@ class IgnoreMetrics(Metric):
     def generate(self):
         return
 
-    def write_manifest(self):
+    def write_manifest(self, overwrite=False):
         return
 
 
