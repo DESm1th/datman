@@ -125,10 +125,16 @@ def generate_subject_qc(subject, config):
     """
     ************* add doc string ************************
     """
+    try:
+        os.mkdir(subject.qc_path)
+    except FileExistsError:
+        pass
+
     # What if missing or database not accessible (template in assets)?
     db_subject = datman.dashboard.get_subject(subject.full_id)
 
     # How to determine when header diffs needs to re-run if gs changes?
+    # Could refactor this to be within the loop too..
     check_headers(db_subject, config)
 
     if subject.is_phantom:
@@ -139,6 +145,8 @@ def generate_subject_qc(subject, config):
     # Remember to use Metric.exists() when determining whether to submit job...
 
     for nii in subject.niftis:
+        # Need a function that takes a nifti specifically (how to invoke from
+        # db?, will need to make a datman.scan.Series....)
         db_scan = datman.dashboard.get_scan(nii.file_name)
         if not db_scan:
             ############ Maybe just add it here instead? File exists.
@@ -154,14 +162,16 @@ def generate_subject_qc(subject, config):
         except Exception as e:
             logger.error(f"Failed to generate metrics for {nii.file_name}. "
                          f"Reason - {e}")
-            return
+            continue
 
         # Might want to check all are runnable before running anything / submitting job
         if not metric.is_runnable():
-            logger.error(f"Can't generate QC metrics for {nii.file_name}. "
-                         "Software pre-requisites missing. Check all commands "
-                         f"are available: {metric.get_requirements()}")
-            return
+            logger.error(
+                f"Can't generate QC metrics for {nii.file_name}, software "
+                "pre-requisites missing. Check all commands are available: "
+                f"{', '.join(metric.get_requirements())}"
+            )
+            continue
 
         metric.generate()
         metric.write_manifest(overwrite=REWRITE)
