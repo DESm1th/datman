@@ -132,6 +132,14 @@ def submit_subjects(config):
     Args:
         config (:obj:`datman.config.config`): A config object for the study.
     """
+    missing_cmds = check_prerequisites()
+    if missing_cmds:
+        logger.error(
+            "Quitting. Software pre-requisite(s) missing, check all commands "
+            f"installed: {', '.join(missing_cmds)}"
+        )
+        return
+
     subs = get_subids(config)
 
     for subject in subs:
@@ -145,6 +153,19 @@ def submit_subjects(config):
         datman.utils.submit_job(
             command, job_name, "/tmp", system=config.system
         )
+
+
+def check_prerequisites():
+    missing_requirements = []
+    for metric_type in datman.metrics.QC_FUNC.values():
+        if not metric_type.is_runnable():
+            missing_requirements.extend(metric_type.get_requirements())
+
+    for metric_type in datman.metrics.PHA_QC_FUNC.values():
+        if not metric_type.is_runnable():
+            missing_requirements.extend(metric_type.get_requirements())
+
+    return list(set(missing_requirements))
 
 
 def get_subids(config):

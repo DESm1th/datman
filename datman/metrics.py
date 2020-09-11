@@ -72,18 +72,20 @@ class Metric(ABC):
                     manifest[file_path] = vars(output)
         return manifest
 
-    def get_requirements(self):
+    @classmethod
+    def get_requirements(cls):
         requires = []
-        for command in self.outputs:
+        for command in cls.outputs:
             try:
-                found = self.requires[command]
+                found = cls.requires[command]
             except KeyError:
                 found = [command]
             requires.extend(found)
         return list(set(requires))
 
-    def is_runnable(self):
-        requires = self.get_requirements()
+    @classmethod
+    def is_runnable(cls):
+        requires = cls.get_requirements()
         for prereq in requires:
             code, _ = run(f"which {prereq}")
             if code != 0:
@@ -213,9 +215,6 @@ class IgnoreMetrics(Metric):
     outputs = {}
 
     def exists(self):
-        return True
-
-    def is_runnable(self):
         return True
 
     def generate(self):
