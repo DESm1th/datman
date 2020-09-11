@@ -76,7 +76,7 @@ def main():
     if not session:
         return submit_subjects(config)
 
-    if not dashboard.dash_found:
+    if not datman.dashboard.dash_found:
         logger.error("Dashboard database not found, can't run.")
         return
 
@@ -305,7 +305,7 @@ def make_metrics(subject, config):
         handlers = datman.metrics.QC_FUNC
 
     for nii in subject.niftis:
-        db_record = datman.dashboard.get_scan(file_name)
+        db_record = datman.dashboard.get_scan(nii.file_name)
         if not db_record:
             logger.error(
                 f"Database record doesnt exist for scan {nii.file_name}. "
@@ -373,7 +373,7 @@ def run_qc(metric, db_record, header_ignore=None, header_tolerance=None):
         metric.write_manifest(overwrite=REMAKE)
 
 
-def add_scan_lengths(nii_path, scan):
+def add_scan_length(nii_path, scan):
     """Find length of scan and add to database.
 
     Args:
