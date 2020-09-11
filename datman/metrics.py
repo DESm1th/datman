@@ -391,3 +391,20 @@ class ABCDPHAMetrics(Metric):
 
     def generate(self):
         self.run(f"qc-abcd-fmri {self.input} {self.output_root}")
+
+
+QC_FUNC = {
+    "anat": AnatMetrics,
+    "fmri": FMRIMetrics,
+    "dti": DTIMetrics,
+    "ignore": IgnoreMetrics
+}
+
+PHA_QC_FUNC = {
+    "anat": AnatPHAMetrics,
+    "fmri": FMRIPHAMetrics,
+    "dti": DTIPHAMetrics,
+    "qa_dti": QAPHAMetrics,
+    "abcd_fmri": ABCDPHAMetrics,
+    "ignore": IgnoreMetrics
+}
