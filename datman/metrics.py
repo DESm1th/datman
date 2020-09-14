@@ -314,7 +314,7 @@ class AnatPHAMetrics(Metric):
     }
 
     def generate(self):
-        self.run(f"qc-adni {self.input} {self.output_root}")
+        self.run(f"qc-adni {self.input} {self.output_root}", "qc-adni")
 
 
 class FMRIPHAMetrics(Metric):
@@ -327,7 +327,8 @@ class FMRIPHAMetrics(Metric):
     }
 
     def generate(self):
-        self.run(f"qc-fbirn-fmri {self.input} {self.output_root}")
+        self.run(f"qc-fbirn-fmri {self.input} {self.output_root}",
+                 "qc-fbirn-fmri")
 
 
 class DTIPHAMetrics(MetricDTI):
@@ -337,7 +338,7 @@ class DTIPHAMetrics(MetricDTI):
 
     def generate(self):
         self.run(f"qc-fbirn-dti {self.input} {self.bvec} {self.bval} "
-                 f"{self.output_root}")
+                 f"{self.output_root}", "qc-fbirn-dti")
 
 
 class QAPHAMetrics(MetricDTI):
@@ -389,7 +390,8 @@ class ABCDPHAMetrics(Metric):
     }
 
     def generate(self):
-        self.run(f"qc-abcd-fmri {self.input} {self.output_root}")
+        self.run(f"qc-abcd-fmri {self.input} {self.output_root}",
+                 "qc-abcd-fmri")
 
 
 QC_FUNC = {
