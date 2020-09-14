@@ -381,7 +381,7 @@ class QAPHAMetrics(MetricDTI):
     def generate(self):
         self.run(f"qa-dti {self.input} {self.bvec} {self.bval}"
                  f"{' --accel ' if self.accel else ''} "
-                 f"{self.output_root}")
+                 f"{self.output_root}", "qa-dti")
 
 
 class ABCDPHAMetrics(Metric):
