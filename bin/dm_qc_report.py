@@ -147,7 +147,7 @@ def submit_subjects(config):
             continue
 
         command = make_command(subject)
-        job_name = f"qc_{subject}_{time.strftime('%Y%m%d')}"
+        job_name = f"qc-{subject}-{time.strftime('%Y%m%d')}"
 
         logger.info(f"Submitting QC job for {subject}.")
         datman.utils.submit_job(
@@ -319,10 +319,11 @@ def make_metrics(subject, config):
             logger.error(f"Failed to generate metrics for {nii.file_name}. "
                          f"Reason - {e}")
 
-        run_qc(metric, db_record, ignored_fields, field_tolerances)
+        make_scan_metrics(metric, db_record, ignored_fields, field_tolerances)
 
 
-def run_qc(metric, db_record, header_ignore=None, header_tolerance=None):
+def make_scan_metrics(metric, db_record, header_ignore=None,
+                      header_tolerance=None):
     """Generate all metrics for a single scan.
 
     Args:
@@ -337,7 +338,8 @@ def run_qc(metric, db_record, header_ignore=None, header_tolerance=None):
 
     if REMAKE or db_record.is_outdated_header_diffs():
         try:
-            db_record.update_header_diffs(ignore=ignore, tolerance=tolerance)
+            db_record.update_header_diffs(
+                ignore=header_ignore, tolerance=header_tolerance)
         except Exception as e:
             logger.error(
                 f"Failed generating header diffs for {str(db_record)} due to "
