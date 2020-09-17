@@ -69,7 +69,7 @@ class Metric(ABC):
             for file_path in self.outputs[command]:
                 output = self.outputs[command][file_path]
                 if isinstance(output, QCOutput):
-                    manifest[file_path] = vars(output)
+                    manifest[os.path.basename(file_path)] = vars(output)
         return manifest
 
     @classmethod
@@ -352,11 +352,12 @@ class QAPHAMetrics(MetricDTI):
             "NyquistRatio-PAR.jpg": QCOutput(6),
             "Plot-EddyCurrentDist-PAR.jpg": QCOutput(7),
             "SNRImgs-PAR.jpg": QCOutput(8),
+            # SNRPlots-PAR.jpg missing
             "StdPlotsHist-PAR.jpg": QCOutput(9),
             "Section2.3.1_SNR_ADC.csv": None,
-            "Section2.3.2_B0DistortionRation.csv": None,
+            "Section2.3.2_B0DistortionRation.csv": None, # missing
             "Section2.3.3_EddyCurrentDistortions.csv": None,
-            "Section2.3.4_AveNyqRation.csv": None,
+            "Section2.3.4_AveNyqRation.csv": None, # missing
             "Section2.3.5_FAvalues.csv": None
         }
     }
