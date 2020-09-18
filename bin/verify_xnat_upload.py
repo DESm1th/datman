@@ -66,7 +66,7 @@ class ScanFolder:
                 continue
             self.raw_entry = None
             for entry in child['items']:
-                if 'SNAPSHOT' in entry['data_fields']['content']:
+                if 'SNAPSHOT' in entry['data_fields'].get('content', ''):
                     continue
                 self.raw_entry = entry
                 self.f_count = entry['data_fields']['file_count']
