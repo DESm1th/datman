@@ -66,7 +66,8 @@ class ScanFolder:
                 continue
             self.raw_entry = None
             for entry in child['items']:
-                if 'SNAPSHOT' in entry['data_fields'].get('content', ''):
+                if ('content' not in entry['data_fields'] or
+                    'SNAPSHOT' in entry['data_fields']['content']):
                     continue
                 self.raw_entry = entry
                 self.f_count = entry['data_fields']['file_count']
