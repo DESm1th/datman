@@ -14,6 +14,7 @@ Args:
 Options:
     --output <path>     The path to dump the file count differences that were
                         found.
+    --fix               Whether to attempt to upload missing files. [Default=False]
 """
 import os
 import urllib
@@ -233,6 +234,7 @@ def main():
     kcni_project = arguments['<kcni_project>']
     dm_exp = arguments['<datman_exp>']
     output = arguments['--output']
+    fix = arguments['--fix']
 
     config = datman.config.config(study=study)
     try:
@@ -294,8 +296,9 @@ def main():
                 'diff_resources': res_diffs['differ']
             }
 
-        upload_scans(dm_exp, kcni_exp, scan_diffs['missing'])
-        upload_resources(dm_exp, kcni_exp, res_diffs['missing'])
+        if fix:
+            upload_scans(dm_exp, kcni_exp, scan_diffs['missing'])
+            upload_resources(dm_exp, kcni_exp, res_diffs['missing'])
 
     if not output:
         print(f"Discovered differences: {diffs}")
