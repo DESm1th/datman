@@ -62,6 +62,12 @@ class ScanFolder:
     def __init__(self, series_num, xnat_entry):
         self.full_entry = xnat_entry
         self.series = series_num
+        if not xnat_entry['children']:
+            self.raw_entry = None
+            self.f_count = 0
+            self.f_size = 0
+            return
+
         for child in xnat_entry['children']:
             if child['field'] != 'file':
                 continue
