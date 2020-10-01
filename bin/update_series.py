@@ -44,7 +44,7 @@ def update_series(input_dir):
         try:
             new_num = str(int(os.path.basename(series).split("_")[0]))
         except:
-            print(f"Malformed series number for folder {series}"
+            print(f"Malformed series number for folder {series}")
             continue
 
         for cur_dir, sub_dirs, files in os.walk(series):
