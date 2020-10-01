@@ -41,8 +41,12 @@ def main():
 def update_series(input_dir):
     for series in glob.glob(input_dir + "/*_MR1_*"):
         logger.info("Working on {}".format(series))
+        try:
+            new_num = str(int(os.path.basename(series).split("_")[0]))
+        except:
+            print(f"Malformed series number for folder {series}"
+            continue
 
-        new_num = os.path.basename(series).split("_")[0]
         for cur_dir, sub_dirs, files in os.walk(series):
             for item in files:
                 dicom_path = os.path.join(cur_dir, item)
@@ -52,7 +56,10 @@ def update_series(input_dir):
                     continue
 
                 header.SeriesNumber = new_num
-                header.save_as(dicom_path)
+                try:
+                    header.save_as(dicom_path)
+                except:
+                    print(f"Failed update for {dicom_path}")
 
 
 if __name__ == '__main__':
