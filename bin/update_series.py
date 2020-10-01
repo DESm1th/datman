@@ -39,7 +39,7 @@ def main():
     update_series(in_dir)
 
 def update_series(input_dir):
-    for series in glob.glob(input_dir + "*_MR1_*"):
+    for series in glob.glob(input_dir + "/*_MR1_*"):
         logger.info("Working on {}".format(series))
 
         new_num = os.path.basename(series).split("_")[0]
