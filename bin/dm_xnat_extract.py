@@ -246,7 +246,12 @@ def get_projects(config):
     """
     projects = {}
     for site in config.get_sites():
-        xnat_project = config.get_key("XNAT_Archive", site=site)
+        try:
+            xnat_project = config.get_key("XNAT_Archive", site=site)
+        except datman.config.UndefinedSetting:
+            logger.warning(f"{site} doesnt define an XNAT_Archive to pull "
+                           "from. Ignoring.")
+            continue
         projects.setdefault(xnat_project, set()).add(site)
     return projects
 
