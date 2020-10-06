@@ -84,14 +84,14 @@ class ScanFolder:
 
     def get_format(self):
         for child in self.full_entry["children"]:
-            for item in self.full_entry["items"]:
+            for item in child["items"]:
                 if 'data_fields' not in item:
                     continue
-                if 'format' in item['data_fields']:
-                    return item['data_fields']['format']
+                if 'label' in item['data_fields']:
+                    return item['data_fields']['label']
                 else:
-                    if 'label' in item['data_fields']:
-                        return item['data_fields']['label']
+                    if 'format' in item['data_fields']:
+                        return item['data_fields']['format']
         return 'DICOM'
 
     def __repr__(self):
