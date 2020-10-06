@@ -747,7 +747,8 @@ class xnat(object):
             raise err
 
     def get_dicom(
-        self, project, session, experiment, scan, filename=None, retries=3
+        self, project, session, experiment, scan, filename=None, retries=3,
+        file_type="DICOM"
     ):
         """Downloads a dicom file from xnat to filename
         If filename is not specified creates a temporary file
@@ -756,7 +757,7 @@ class xnat(object):
         url = (
             f"{self.server}/data/archive/projects/{project}/"
             f"subjects/{session}/experiments/{experiment}/"
-            f"scans/{scan}/resources/DICOM/files?format=zip"
+            f"scans/{scan}/resources/{file_type}/files?format=zip"
         )
 
         if not filename:

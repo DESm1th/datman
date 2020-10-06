@@ -82,6 +82,18 @@ class ScanFolder:
             if self.raw_entry is None:
                 raise Exception(f"No dicom entry found for series {series_num}")
 
+    def get_format(self):
+        for child in self.full_entry["children"]:
+            for item in self.full_entry["items"]:
+                if 'data_fields' not in item:
+                    continue
+                if 'format' in item['data_fields']:
+                    return item['data_fields']['format']
+                else:
+                    if 'label' in item['data_fields']:
+                        return item['data_fields']['label']
+        return 'DICOM'
+
     def __repr__(self):
         return f"<ScanFolder: {self.series}>"
 
@@ -163,21 +175,23 @@ def check_scans(dm_exp, kcni_exp):
 
     for series in dm_scans:
         if series not in kcni_scans:
-            diffs['missing'].append(series)
+            diffs['missing'].append((series, dm_scans[series].get_format()))
         elif dm_scans[series].f_count != kcni_scans[series].f_count:
             diffs[series] = {
                 'dm_count': dm_scans[series].f_count,
-                'kcni_count': kcni_scans[series].f_count
+                'kcni_count': kcni_scans[series].f_count,
+                'format': dm_scans[series].get_format()
             }
 
     return diffs
 
 
 def upload_scans(dm_exp, kcni_exp, missing):
-    for series_num in missing:
+    for series_num, series_type in missing:
         try:
             dicom_zip = dm_xnat.get_dicom(
-                dm_exp.project, dm_exp.subject, dm_exp.name, series_num
+                dm_exp.project, dm_exp.subject, dm_exp.name, series_num,
+                file_type=series_type
             )
         except Exception as e:
             print(f"Failed downloading series {series_num} for {dm_exp.name}."
