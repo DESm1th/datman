@@ -15,6 +15,9 @@ Options:
     --output <path>     The path to dump the file count differences that were
                         found.
     --fix               Whether to attempt to upload missing files. [Default=False]
+    --site SITE         Restrict the search to a specific site. Used when
+                        multiple site codes are combined within one
+                        XNAT project on TIGRLab's xnat server.
 """
 import os
 import urllib
@@ -255,6 +258,7 @@ def main():
     dm_exp = arguments['<datman_exp>']
     output = arguments['--output']
     fix = arguments['--fix']
+    site = arguments['--site']
 
     config = datman.config.config(study=study)
     try:
@@ -274,6 +278,9 @@ def main():
             dm_ident = datman.scanid.parse(exp_id)
         except datman.scanid.ParseException:
             print(f"Failed to parse experiment ID {exp_id}. Ignoring.")
+            continue
+
+        if site and site != dm_ident.site:
             continue
 
         try:
