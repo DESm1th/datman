@@ -11,6 +11,10 @@ the config files. Be warned: these deletes will cascade to scans that reference
 the bad values (e.g. deleting a tag that's no longer used for a study like
 'FMAP' will also delete all scan records for that study with that tag).
 
+To prevent a project's settings file from being added to the database
+add the key 'DB_IGNORE', with any value other than the boolean False, to
+that file.
+
 Usage:
     update_config.py [options]
     update_config.py [options] <study>
@@ -130,6 +134,14 @@ def update_study(study_id, config, skip_delete=False, delete_all=False):
         config.set_study(study_id)
     except Exception as e:
         logger.error(f"Can't access config for {study_id}. Reason - {e}")
+        return
+
+    try:
+        ignore = config.get_key('DB_IGNORE')
+    except UndefinedSetting:
+        ignore = False
+
+    if ignore:
         return
 
     study = datman.dashboard.get_project(study_id, create=True)
