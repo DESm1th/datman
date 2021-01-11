@@ -125,10 +125,6 @@ def prompt_delete(message):
     return prompt_user(message + " Delete? (y/[n]) ")
 
 
-# def prompt_update(message):
-#     return prompt_user(message + " Update? (y/[n]) ")
-
-
 def update_study(study_id, config, skip_delete=False, delete_all=False):
     try:
         config.set_study(study_id)
