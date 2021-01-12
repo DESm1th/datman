@@ -127,6 +127,10 @@ def check_resources(dm_exp, kcni_exp):
     }
 
     for folder in dm_resources:
+        if folder == 'NOLABEL':
+            # Ignore NOLABEL folders, they're a product of an old xnat_upload bug
+            continue
+
         if dm_resources[folder].f_count == 0:
             # Ignore empty folders on our server
             continue
@@ -272,6 +276,10 @@ def main():
         experiments = dm_xnat.get_experiment_ids(dm_project)
 
     diffs = {}
+
+    if not experiments:
+        print(f"No experiments found on original server for {dm_project}. Check project name.")
+        return
 
     for exp_id in experiments:
         try:
