@@ -117,8 +117,8 @@ def get_scans(exp):
     }
 
 
-def get_digests(files):
-    return {item['URI']: item['digest'] for item in files}
+def sort_files(files):
+    return {item['URI']: item for item in files}
 
 
 def check_resources(dm_exp, kcni_exp):
@@ -166,14 +166,14 @@ def check_resources(dm_exp, kcni_exp):
                 kcni_rid
             )
 
-            kcni_digests = get_digests(kcni_files)
-            dm_digests = get_digests(dm_files)
+            kcni_files = sort_files(kcni_files)
+            dm_files = sort_files(dm_files)
 
-            for uri in dm_digests:
-                if uri not in kcni_digests:
-                    diffs['missing'].setdefault(dm_rid, []).append(uri)
-                elif dm_digests[uri] != kcni_digests[uri]:
-                    diffs['differ'].append((dm_rid, uri))
+            for uri in dm_files:
+                if uri not in kcni_files:
+                    diffs['missing'].setdefault(dm_rid, []).append(dm_files[uri])
+                elif dm_digests[uri]['digest'] != kcni_digests[uri]['digest']:
+                    diffs['differ'].append((dm_rid, dm_files[uri], kcni_files[uri]))
     return diffs
 
 
