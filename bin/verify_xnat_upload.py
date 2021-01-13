@@ -173,7 +173,7 @@ def check_resources(dm_exp, kcni_exp):
                 if uri not in kcni_digests:
                     diffs['missing'].setdefault(dm_rid, []).append(uri)
                 elif dm_digests[uri] != kcni_digests[uri]:
-                    diffs['differ'].append((r_id, uri))
+                    diffs['differ'].append((dm_rid, uri))
     return diffs
 
 
