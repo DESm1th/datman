@@ -117,6 +117,10 @@ def get_scans(exp):
     }
 
 
+def get_digests(files):
+    return {item['URI']: item['digest'] for item in files}
+
+
 def check_resources(dm_exp, kcni_exp):
     dm_resources = get_resources(dm_exp)
     kcni_resources = get_resources(kcni_exp)
@@ -144,7 +148,7 @@ def check_resources(dm_exp, kcni_exp):
                 r_id
             )
             diffs['missing'][r_id] = file_list
-        elif dm_resources[folder].f_count != kcni_resources[folder].f_count:
+        else:
             dm_rid = dm_exp.resource_IDs[folder]
             kcni_rid = kcni_exp.resource_IDs[folder]
 
@@ -161,13 +165,15 @@ def check_resources(dm_exp, kcni_exp):
                 kcni_exp.name,
                 kcni_rid
             )
-            kcni_uris = [entry['URI'] for entry in kcni_files]
 
-            diffs['missing'][dm_rid] = []
-            for entry in dm_files:
-                if entry['URI'] not in kcni_uris:
-                    diffs['missing'][dm_rid].append(entry)
+            kcni_digests = get_digests(kcni_files)
+            dm_digests = get_digests(dm_files)
 
+            for uri in dm_digests:
+                if uri not in kcni_digests:
+                    diffs['missing'].setdefault(dm_rid, []).append(uri)
+                elif dm_digests[uri] != kcni_digests[uri]:
+                    diffs['differ'].setdefault(dm_rid, []).append(uri)
     return diffs
 
 
@@ -225,7 +231,7 @@ def upload_resources(dm_exp, kcni_exp, missing):
             try:
                 source = dm_xnat.get_resource(
                     dm_exp.project, dm_exp.subject, dm_exp.name, r_id,
-                    entry['URI']
+                    entry['URI'], zipped=False
                 )
             except Exception as e:
                 print(f"Failed uploading resource {entry['URI']} for "
