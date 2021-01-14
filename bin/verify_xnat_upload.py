@@ -118,7 +118,11 @@ def get_scans(exp):
 
 
 def sort_files(files):
-    return {item['URI']: item for item in files}
+    # Unquote and then quote to avoid coding the % from earlier quoting
+    return {
+        urllib.parse.quote(urllib.parse.unquote(item['URI'])): item
+        for item in files
+    }
 
 
 def check_resources(dm_exp, kcni_exp):
