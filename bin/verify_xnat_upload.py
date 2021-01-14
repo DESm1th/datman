@@ -15,6 +15,8 @@ Options:
     --output <path>     The path to dump the file count differences that were
                         found.
     --fix               Whether to attempt to upload missing files. [Default=False]
+    --purge             Whether to delete files that dont match source server.
+                        [Default=False]
     --site SITE         Restrict the search to a specific site. Used when
                         multiple site codes are combined within one
                         XNAT project on TIGRLab's xnat server.
@@ -125,7 +127,7 @@ def sort_files(files):
     }
 
 
-def check_resources(dm_exp, kcni_exp):
+def check_resources(dm_exp, kcni_exp, purge):
     dm_resources = get_resources(dm_exp)
     kcni_resources = get_resources(kcni_exp)
 
@@ -178,6 +180,11 @@ def check_resources(dm_exp, kcni_exp):
                     diffs['missing'].setdefault(dm_rid, []).append(dm_files[uri])
                 elif dm_files[uri]['digest'] != kcni_files[uri]['digest']:
                     diffs['differ'].append((dm_rid, dm_files[uri], kcni_files[uri]))
+                    if purge:
+                        kcni_xnat.delete_resource(
+                            kcni_exp.project, kcni_exp.subject, kcni_exp.name,
+                            kcni_rid, dm_files[uri]['ID']
+                        )
     return diffs
 
 
@@ -272,6 +279,7 @@ def main():
     dm_exp = arguments['<datman_exp>']
     output = arguments['--output']
     fix = arguments['--fix']
+    purge = argument['--purge']
     site = arguments['--site']
 
     config = datman.config.config(study=study)
@@ -328,7 +336,7 @@ def main():
             continue
 
         scan_diffs = check_scans(dm_exp, kcni_exp)
-        res_diffs = check_resources(dm_exp, kcni_exp)
+        res_diffs = check_resources(dm_exp, kcni_exp, purge)
 
         diffs[exp_id] = {
             'missing_scans': scan_diffs['missing'],
