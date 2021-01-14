@@ -279,7 +279,7 @@ def main():
     dm_exp = arguments['<datman_exp>']
     output = arguments['--output']
     fix = arguments['--fix']
-    purge = argument['--purge']
+    purge = arguments['--purge']
     site = arguments['--site']
 
     config = datman.config.config(study=study)
