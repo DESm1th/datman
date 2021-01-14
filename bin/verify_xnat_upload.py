@@ -172,7 +172,7 @@ def check_resources(dm_exp, kcni_exp):
             for uri in dm_files:
                 if uri not in kcni_files:
                     diffs['missing'].setdefault(dm_rid, []).append(dm_files[uri])
-                elif dm_digests[uri]['digest'] != kcni_digests[uri]['digest']:
+                elif dm_files[uri]['digest'] != kcni_files[uri]['digest']:
                     diffs['differ'].append((dm_rid, dm_files[uri], kcni_files[uri]))
     return diffs
 
