@@ -1,3 +1,4 @@
+#!/usr/bin/env python
 """Compare a newly downloaded set of files to a backed up copy to report
 missing files.
 
