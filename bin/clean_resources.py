@@ -67,7 +67,7 @@ def main():
     missing = [item for item in old_folders if item not in new_folders]
     matched = [item for item in old_folders if item in new_folders]
 
-    diffs = {}
+    diffs = {'absent': missing}
     for subid in matched:
         diffs[subid] = compare_folder(old_copy, new_copy, subid)
 
