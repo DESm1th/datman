@@ -9,12 +9,16 @@ from datman.exceptions import DashboardException
 logger = logging.getLogger(__name__)
 
 try:
-    from dashboard import queries, monitors, connect_db
+    from dashboard import connect_db
 except ImportError:
     dash_found = False
     logger.error("Dashboard not found, proceeding without it.")
 else:
-    connect_db()
+    # Set autocommit to True to ensure 'select' queries dont leave
+    # transactions in an 'idle in transaction' state
+    connect_db(autocommit=True)
+    # Import these after connecting the db or autocommit doesn't propagate
+    from dashboard import queries, monitors
     dash_found = True
 
 
