@@ -73,7 +73,4 @@ all = [
 ]
 
 [tool.setuptools.packages.find]
-exclude = [
-    "docs*",
-    "tests*"
-]
+include = ["datman*"]
