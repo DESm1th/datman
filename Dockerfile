@@ -1,21 +1,15 @@
-FROM ubuntu:focal-20210416
+FROM ubuntu:focal
 
 # Install dependencies
 RUN apt update && \
-    apt install -y wget unzip git python3.8 python3-pip && \
+    apt install -y --no-install-recommends wget unzip ssh python3.8 python3-pip && \
     cd /usr/bin/ && \
-    ln -s python3.8 python && \
-    pip install --upgrade pip
+    ln -s python3.8 python
 
 # Install dcm2niix/v1.0.20211006
 RUN cd /tmp && \
     wget https://github.com/rordenlab/dcm2niix/releases/download/v1.0.20211006/dcm2niix_lnx.zip && \
     unzip -d /usr/bin/ dcm2niix_lnx.zip
-
-RUN cd / && \
-    git clone https://github.com/TIGRLab/datman.git && \
-    cd datman && \
-    pip install .
 
 # Fix for dm_sftp.py's pysftp hostkey issues
 RUN mkdir /.ssh && \
@@ -28,5 +22,10 @@ ENV PATH="${PATH}:/datman/bin"
 ENV DM_CONFIG=/config/main_config.yml
 ENV DM_SYSTEM=docker
 
-WORKDIR /
+COPY . /datman
+
+RUN cd /datman && \
+    python -m pip install --upgrade pip && \
+    python -m pip install .
+
 CMD ["/bin/bash"]
