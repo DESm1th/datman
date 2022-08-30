@@ -1,6 +1,11 @@
 [build-system]
-requires = ["setuptools >= 40.8.0", "wheel"]
+requires = ["setuptools >= 45", "wheel", "setuptools_scm[toml]>=6.2"]
 build-backend = "setuptools.build_meta"
+
+[tool.setuptools.packages.find]
+include = ["datman*"]
+
+[tool.setuptools_scm]
 
 [project]
 name = "datman"
@@ -73,9 +78,3 @@ all = [
     "datman[docs]",
     "datman[style]"
 ]
-
-[tool.setuptools.packages.find]
-include = ["datman*"]
-
-[tool.setuptools-git-versioning]
-enabled = true
