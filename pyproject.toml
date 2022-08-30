@@ -4,7 +4,6 @@ build-backend = "setuptools.build_meta"
 
 [project]
 name = "datman"
-version = "0.2.1"
 requires-python = ">=3.7"
 description = "datman is a set of scripts for managing MRI data in XNAT, metadata in REDCap and performing visual quality control."
 license = {file = "LICENSE"}
@@ -42,7 +41,10 @@ dependencies = [
     "wrapt ~= 1.11.2"
 ]
 
+dynamic = ["version"]
+
 [urls]
+homepage = "http://imaging-genetics.camh.ca/datman/"
 documentation = "http://imaging-genetics.camh.ca/datman/"
 repository = "https://github.com/tigrlab/datman"
 
@@ -74,3 +76,6 @@ all = [
 
 [tool.setuptools.packages.find]
 include = ["datman*"]
+
+[tool.setuptools-git-versioning]
+enabled = true
