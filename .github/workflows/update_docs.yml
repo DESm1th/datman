@@ -12,8 +12,8 @@ jobs:
       - uses: actions/checkout@v2
       - name: Install python
         run: sudo apt update && sudo apt install -y git python3 python3-pip
-      - name: Make python symlink pointing to python3
-        run: pushd /usr/bin && sudo ln -s python3 python && popd
+      - name: View python version
+        run: python --version
       - name: Update pip
         run: python -m pip install --upgrade pip
       - name: Install docs requirements
