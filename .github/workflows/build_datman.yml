@@ -1,0 +1,18 @@
+name: Reusable datman environment builder
+
+on:
+  workflow_call:
+
+jobs:
+  build:
+    runs-on: ubuntu-20.04
+    steps:
+      - uses: actions/checkout@v2
+      - name: Install python
+        run: apt update && apt install -y git python3 python3-pip
+      - name: Make python symlink pointing to python3
+        run: pushd /usr/bin && ln -s python3 python && popd
+      - name: Update pip
+        run: python -m pip install --upgrade pip
+      - name: Install datman
+        run: python -m pip install .

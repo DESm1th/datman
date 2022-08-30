@@ -1,0 +1,25 @@
+name: Update the documentation
+
+# Update this before PR
+on:
+  push:
+    branches: [fix_config]
+
+jobs:
+  build-docs:
+    runs-on: ubuntu-20.04
+    steps:
+      - name: Build datman
+        uses: ./.github/workflows/build_datman.yml
+      - name: Install docs requirements
+        run: python -m pip install .[docs]
+      - name: Build docs
+        run: sphinx-build docs docs/_build
+      - name: Add .nojekyll file to build folder
+        run: touch docs/_build/.nojekyll
+      - name: Deploy docs if the branch has updated
+        uses: JamesIves/github-pages-deploy-action@v4.2.2
+        with:
+          branch: gh-pages
+          folder: docs/_build
+        if: github.event_name == 'push'
