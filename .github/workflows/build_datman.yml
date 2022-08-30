@@ -7,7 +7,6 @@ jobs:
   build:
     runs-on: ubuntu-20.04
     steps:
-      - uses: actions/checkout@v2
       - name: Install python
         run: apt update && apt install -y git python3 python3-pip
       - name: Make python symlink pointing to python3
