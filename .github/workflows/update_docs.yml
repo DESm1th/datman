@@ -15,7 +15,7 @@ jobs:
       - name: Update pip
         run: python -m pip install --upgrade pip
       - name: Install docs requirements
-        run: python -m pip install ../.[docs]
+        run: ls -al
       # - name: Install docs requirements
       #   run: python -m pip install .[docs]
       # - name: Build docs
