@@ -10,8 +10,12 @@ jobs:
     runs-on: ubuntu-20.04
     steps:
       - uses: actions/checkout@v2
-      - name: Build datman
-        uses: ./../.github/workflows/build_datman.yml
+      - name: Install python
+        run: apt update && apt install -y git python3 python3-pip
+      - name: Make python symlink pointing to python3
+        run: pushd /usr/bin && ln -s python3 python && popd
+      - name: Update pip
+        run: python -m pip install --upgrade pip
       - name: Install docs requirements
         run: python -m pip install .[docs]
       - name: Build docs
