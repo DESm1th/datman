@@ -1,0 +1,46 @@
+name: Update the documentation
+
+# Update this before PR
+on:
+  push:
+    branches: [fix_config]
+
+jobs:
+  run-tests:
+    runs-on: ubuntu-20.04
+    steps:
+      - uses: actions/checkout@v2
+      - uses: ./.github/build_datman
+      - name: Install testing requirements
+        run: python -m pip install .[test]
+      - name: Run tests
+        run: python -m pytest -v tests
+      - name: Check code coverage
+        run: python -m pytest tests --junitxml=tests/junit-report.xml --cov . --cov-report term-missing html
+      - name: Archive junit report
+        uses: actions/upload-artifact@v3
+        with:
+          name: junit-report
+          path: tests/junit-report.xml
+      - name: Archive code coverage report
+        uses: actions/upload-artifact@v3
+        with:
+          name: code-cov-report
+          path: htmlcov
+  build-docs:
+    runs-on: ubuntu-20.04
+    steps:
+      - uses: actions/checkout@v2
+      - uses: ./.github/build_datman
+      - name: Install docs requirements
+        run: python -m pip install .[docs]
+      - name: Build docs
+        run: sphinx-build docs docs/_build
+      - name: Add .nojekyll file to build folder
+        run: touch docs/_build/.nojekyll
+      - name: Deploy docs if the branch has updated
+        uses: JamesIves/github-pages-deploy-action@v4.2.2
+        with:
+          branch: gh-pages
+          folder: docs/_build
+        if: github.event_name == 'push'

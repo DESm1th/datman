@@ -56,7 +56,8 @@ repository = "https://github.com/tigrlab/datman"
 [project.optional-dependencies]
 test = [
     "mock",
-    "pytest"
+    "pytest",
+    "pytest-cov"
 ]
 
 docs = [
