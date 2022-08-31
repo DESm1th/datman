@@ -56,20 +56,22 @@ jobs:
         run: python -m pip install .[build]
       - name: Create package
         run: python -m build
-      - name: See github tag name
-        run: echo "${GITHUB_REF#refs/*/}"
+      - name: Setting hardcoded version for testing
+        run: export VERSION="0.2.1"
+      # - name: See github tag name
+      #   run: echo "${GITHUB_REF#refs/*/}"
       - name: Check sdist
-        run: "twine check dist/datman-${GITHUB_REF#refs/*/}*.tar.gz"
+        run: "twine check dist/datman-${VERSION}*.tar.gz"
       - name: Check wheel
-        run: "twine check dist/datman-${GITHUB_REF#refs/*/}*.whl"
+        run: "twine check dist/datman-${VERSION}*.whl"
       - name: Ensure package version matches expected.
         run: |
           python -m venv /tmp/test_install
           source /tmp/test_install/bin/activate
           pip install --upgrade pip
           pip install dist/datman-*.tar.gz
-          version=$(python -c "import datman; print(datman.__version__)")
-          [ $version == ${GITHUB_REF#refs/*/} ]
+          install_version=$(python -c "import datman; print(datman.__version__)")
+          [ $install_version == ${VERSION} ]
           deactivate
       - name: Upload to test pypi
         run: echo "Skipping for now"
