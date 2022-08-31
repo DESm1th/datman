@@ -69,6 +69,11 @@ docs = [
     "sphinxcontrib-versioning"
 ]
 
+build = [
+    "build ~= 0.8",
+    "twine ~= 4.0.0"
+]
+
 style = [
     "flake8 ~= 3.7.0",
     "pycodestyle"
@@ -77,5 +82,6 @@ style = [
 all = [
     "datman[test]",
     "datman[docs]",
-    "datman[style]"
+    "datman[style]",
+    "datman[build]"
 ]
