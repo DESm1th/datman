@@ -16,7 +16,9 @@ jobs:
       - name: Run tests
         run: python -m pytest -v tests
       - name: Check code coverage
-        run: python -m pytest tests --junitxml=tests/junit-report.xml --cov . --cov-report term-missing --cov-report html
+        run: |
+          python -m pytest tests --junitxml=tests/junit-report.xml --cov . \
+          --cov-report term-missing --cov-report html
       - name: Archive junit report
         uses: actions/upload-artifact@v3
         with:
