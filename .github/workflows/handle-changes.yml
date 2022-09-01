@@ -57,7 +57,7 @@ jobs:
       - name: Create package
         run: python -m build
       - name: Setting hardcoded version for testing
-        run: echo "DM_VERSION='0.2.1'" >> $GITHUB_ENV
+        run: echo "DM_VERSION=0.2.1" >> $GITHUB_ENV
       # - name: See github tag name
       #   run: echo "${GITHUB_REF#refs/*/}"
       - name: Check sdist
