@@ -60,6 +60,8 @@ jobs:
         run: echo "DM_VERSION=0.2.1" >> $GITHUB_ENV
       # - name: See github tag name
       #   run: echo "${GITHUB_REF#refs/*/}"
+      - name: Contents of dist dir
+        run: ls dist/
       - name: Check sdist
         run: "twine check dist/datman-${DM_VERSION}*.tar.gz"
       - name: Check wheel
