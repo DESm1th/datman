@@ -66,5 +66,6 @@ jobs:
         run: "twine check dist/datman-${DM_VERSION}*.whl"
       - name: Publish to test-pypi
         uses: pypa/gh-action-pypi-publish@v1.5.1
+        with:
           password: ${{ secrets.TESTPYPI_API_TOKEN }}
           repository_url: https://test.pypi.org
