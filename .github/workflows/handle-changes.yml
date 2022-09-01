@@ -68,4 +68,4 @@ jobs:
         uses: pypa/gh-action-pypi-publish@v1.5.1
         with:
           password: ${{ secrets.TESTPYPI_API_TOKEN }}
-          repository_url: https://test.pypi.org
+          repository_url: https://test.pypi.org/legacy/
