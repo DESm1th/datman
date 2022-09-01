@@ -71,7 +71,7 @@ jobs:
           pip install --upgrade pip
           pip install dist/datman-*.tar.gz
           install_version=$(python -c "import datman; print(datman.__version__)")
-          [ $install_version == ${VERSION} ]
+          [ "$install_version" == "${VERSION}" ]
           deactivate
       - name: Upload to test pypi
         run: echo "Skipping for now"
