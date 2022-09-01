@@ -74,9 +74,11 @@ jobs:
         run: "export install_version=$(python -c \"import datman; print(datman.__version__)\")"
       - name: Report installed version
         run: echo ${install_version}
+      - name: Echo result of version check
+        run: echo $(python -c \"import datman; print(datman.__version__)\")
       - name: Compare installed version to expected version
         run: "[[ \"$install_version\" == \"${VERSION}\" ]]"
       - name: Deactivate virtual env
-        run: deactivate
+        run: source deactivate
       - name: Upload to test pypi
         run: echo "Skipping for now"
