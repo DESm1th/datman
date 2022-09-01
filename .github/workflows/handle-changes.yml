@@ -71,7 +71,7 @@ jobs:
           pip install --upgrade pip
           pip install dist/datman-*.tar.gz
       - name: Get installed version
-        run: "export install_version=$(python -c \"import datman; print(datman.__version__)\")"
+        run: "export install_version=$(python -c 'import datman; print(datman.__version__)')"
       - name: Report installed version
         run: echo ${install_version}
       - name: Echo result of version check
