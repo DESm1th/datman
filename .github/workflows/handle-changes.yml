@@ -57,13 +57,13 @@ jobs:
       - name: Create package
         run: python -m build
       - name: Setting hardcoded version for testing
-        run: export VERSION="0.2.1"
+        run: echo "DM_VERSION='0.2.1'" >> $GITHUB_ENV
       # - name: See github tag name
       #   run: echo "${GITHUB_REF#refs/*/}"
       - name: Check sdist
-        run: "twine check dist/datman-${VERSION}*.tar.gz"
+        run: "twine check dist/datman-${DM_VERSION}*.tar.gz"
       - name: Check wheel
-        run: "twine check dist/datman-${VERSION}*.whl"
+        run: "twine check dist/datman-${DM_VERSION}*.whl"
       - name: Create virtual env to install sdist in
         run: |
           python -m venv /tmp/test_install
@@ -71,13 +71,13 @@ jobs:
           pip install --upgrade pip
           pip install dist/datman-*.tar.gz
       - name: Get installed version
-        run: "export install_version=$(python -c 'import datman; print(datman.__version__)')"
+        run: echo "PKG_VERSION=$(python -c 'import datman; print(datman.__version__)')" >> $GITHUB_ENV
       - name: Report installed version
-        run: echo ${install_version}
-      - name: Echo result of version check
-        run: echo $(python -c \"import datman; print(datman.__version__)\")
+        run: echo ${PKG_VERSION}
+      - name: Echo expected version
+        run: echo ${DM_VERSION}
       - name: Compare installed version to expected version
-        run: "[[ \"$install_version\" == \"${VERSION}\" ]]"
+        run: "[[ \"${PKG_VERSION}\" == \"${DM_VERSION}\" ]]"
       - name: Deactivate virtual env
         run: source deactivate
       - name: Upload to test pypi
