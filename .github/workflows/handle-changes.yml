@@ -64,12 +64,14 @@ jobs:
         run: "twine check dist/datman-${VERSION}*.tar.gz"
       - name: Check wheel
         run: "twine check dist/datman-${VERSION}*.whl"
-      - name: Ensure package version matches expected.
+      - name: Create virtual env to install sdist in
         run: |
           python -m venv /tmp/test_install
           source /tmp/test_install/bin/activate
           pip install --upgrade pip
           pip install dist/datman-*.tar.gz
+      - name: Compare installed version to expected version
+        run:
           install_version=$(python -c "import datman; print(datman.__version__)")
           [ "$install_version" == "${VERSION}" ]
           deactivate
