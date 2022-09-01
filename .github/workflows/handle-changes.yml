@@ -70,10 +70,11 @@ jobs:
           source /tmp/test_install/bin/activate
           pip install --upgrade pip
           pip install dist/datman-*.tar.gz
+      - name: Get installed version
+        run: install_version=$(python -c "import datman; print(datman.__version__)")
       - name: Compare installed version to expected version
-        run:
-          install_version=$(python -c "import datman; print(datman.__version__)")
-          [ "$install_version" == "${VERSION}" ]
-          deactivate
+        run: [ "$install_version" == "${VERSION}" ]
+      - name: Deactivate virtual env
+        run: deactivate
       - name: Upload to test pypi
         run: echo "Skipping for now"
