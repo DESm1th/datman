@@ -15,6 +15,7 @@ Submodules
    datman.config
    datman.dashboard
    datman.exceptions
+   datman.exporters
    datman.fs_log_scraper
    datman.header_checks
    datman.metrics
