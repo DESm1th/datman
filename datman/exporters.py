@@ -10,6 +10,7 @@ Also, ensure that subclasses define the 'type' attribute to be a short
 unique key that can be referenced in config files (e.g. 'nii').
 """
 from abc import ABC, abstractmethod
+from collections import OrderedDict
 from datetime import datetime
 from glob import glob
 from json import JSONDecodeError
@@ -31,7 +32,7 @@ from datman.utils import (run, make_temp_directory, get_extension,
                           get_relative_source, read_json, write_json)
 
 try:
-    from dcm2bids import Dcm2bids
+    from dcm2bids import dcm2bids, Dcm2bids
 except ImportError:
     DCM2BIDS_FOUND = False
 else:
@@ -297,6 +298,100 @@ class BidsExporter(SessionExporter):
         sidecars = glob(os.path.join(self.output_dir, "*", "*.json"))
         contents = {path: read_json(path) for path in sidecars}
         return contents
+
+    def find_missing_scans(self):
+        """Find scans that exist on xnat but are missing from the bids folder.
+        """
+        class FakeSidecar(dcm2bids.Sidecar):
+            """Turns XNAT series descriptions into pseudo-sidecars.
+            """
+            def __init__(self, xnat_scan):
+                self.scan = xnat_scan
+                self.data = xnat_scan
+                self.compKeys = dcm2bids.DEFAULT.compKeys
+
+                # Placeholders for compatibility with dcm2bids.Sidecar
+                self.root = (
+                    f"/tmp/{xnat_scan.series}"
+                    + f"_{xnat_scan.description}"
+                    + f"_{xnat_scan.subject}"
+                )
+                self.filename = f"{self.root}.json"
+                self.data["SidecarFilename"] = self.filename
+
+            @property
+            def data(self):
+                return self._data
+
+            @data.setter
+            def data(self, scan):
+                self._data = OrderedDict()
+                self._data['SeriesDescription'] = scan.description
+                self._data['SeriesNumber'] = scan.series
+
+            def __repr__(self):
+                return f"<FakeSidecar {self.data['SeriesDescription']}>"
+
+        def get_jsons(start_dir):
+            """Find all json files in the given start directory.
+            """
+            jsons = []
+            for root, _, files in os.walk(start_dir):
+                for item in files:
+                    if item.endswith(".json"):
+                        jsons.append(os.path.join(root, item))
+            return jsons
+
+        def get_expected_names(participant, sidecars, bids_conf):
+            parser = dcm2bids.SidecarPairing(
+                sidecars, bids_conf["descriptions"]
+            )
+            parser.build_graph()
+            parser.build_acquisitions(participant)
+            parser.find_runs()
+            return [acq.dstRoot for acq in parser.acquisitions]
+
+        participant = dcm2bids.Participant(
+            self.bids_sub, session=self.bids_ses
+        )
+
+        bids_conf = dcm2bids.load_json(self.dcm2bids_config)
+
+        bids_tmp = os.path.join(
+            self.bids_folder,
+            "tmp_dcm2bids",
+            f"{self.session.bids_sub}_{self.session.bids_ses}"
+        )
+
+        local_sidecars = []
+        for search_path in [self.output_dir, bids_tmp]:
+            for item in get_jsons(search_path):
+                local_sidecars.append(dcm2bids.Sidecar(item))
+        local_sidecars = sorted(local_sidecars)
+
+        xnat_sidecars = []
+        for scan in self.experiment.scans:
+            xnat_sidecars.append(FakeSidecar(scan))
+        xnat_sidecars = sorted(xnat_sidecars)
+
+        xnat_scans = get_expected_names(
+            participant, xnat_sidecars, bids_conf
+        )
+        local_scans = get_expected_names(
+            participant, local_sidecars, bids_conf
+        )
+
+        missing_scans = []
+        for scan in xnat_scans:
+            if scan not in local_scans:
+                missing_scans.append(scan)
+
+        extra_scans = []
+        for scan in local_scans:
+            if scan not in xnat_scans:
+                extra_scans.append(scan)
+
+        return missing_scans, extra_scans
 
 
 class NiiLinkExporter(SessionExporter):
