@@ -33,6 +33,7 @@ from datman.utils import (run, make_temp_directory, get_extension,
 
 try:
     from dcm2bids import dcm2bids, Dcm2bids
+    from dcm2bids.sidecar import Acquisition
 except ImportError:
     DCM2BIDS_FOUND = False
 else:
@@ -351,6 +352,17 @@ class BidsExporter(SessionExporter):
             parser.find_runs()
             return [acq.dstRoot for acq in parser.acquisitions]
 
+        def remove_criteria(descriptions):
+            trim_conf = []
+            for descr in bids_conf['descriptions']:
+                new_descr = descr.copy()
+                if len(descr['criteria']) > 1:
+                    new_descr['criteria'] = OrderedDict()
+                    new_descr['criteria']['SeriesDescription'] = descr[
+                        'criteria']['SeriesDescription']
+                trim_conf.append(new_descr)
+            return trim_conf
+
         participant = dcm2bids.Participant(
             self.bids_sub, session=self.bids_ses
         )
@@ -374,22 +386,49 @@ class BidsExporter(SessionExporter):
             xnat_sidecars.append(FakeSidecar(scan))
         xnat_sidecars = sorted(xnat_sidecars)
 
-        xnat_scans = get_expected_names(
-            participant, xnat_sidecars, bids_conf
-        )
+        # xnat_scans = get_expected_names(
+        #     participant, xnat_sidecars, bids_conf
+        # )
         local_scans = get_expected_names(
             participant, local_sidecars, bids_conf
         )
 
+        # Use a more permissive bids_conf when finding xnat acqs
+        xnat_parser = dcm2bids.SidecarPairing(
+            xnat_sidecars, remove_criteria(bids_conf['descriptions'])
+        )
+        xnat_parser.build_graph()
+        xnat_parser.build_acquisitions(participant)
+        # Use this to find scans that have extra 'criteria' for single match
+        extra_acqs = []
+        for sidecar, descriptions in xnat_parser.graph.items():
+            if len(descriptions) > 1:
+                for descr in descriptions:
+                    acq = Acquisition(participant, srcSidecar=sidecar, **descr)
+                    extra_acqs.append(acq)
+        xnat_parser.acquisitions.extend(extra_acqs)
+        xnat_parser.find_runs()
+        xnat_scans = [acq.dstRoot for acq in xnat_parser.acquisitions]
+
         missing_scans = []
         for scan in xnat_scans:
             if scan not in local_scans:
-                missing_scans.append(scan)
+                if "run-01" in scan:
+                    norun_scan = scan.replace("_run-01", "")
+                    if norun_scan not in local_scans:
+                        missing_scans.append(scan)
+                else:
+                    missing_scans.append(scan)
 
         extra_scans = []
         for scan in local_scans:
             if scan not in xnat_scans:
-                extra_scans.append(scan)
+                if "run-01" in scan:
+                    norun_scan = scan.replace("_run-01", "")
+                    if norun_scan not in xnat_scans:
+                        extra_scans.append(scan)
+                else:
+                    extra_scans.append(scan)
 
         return missing_scans, extra_scans
 
