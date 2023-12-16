@@ -227,22 +227,101 @@ class BidsExporter(SessionExporter):
             logging.getLogger(logger_name).setLevel(level)
 
     def get_expected_scans(self):
-        # parser = self.get_xnat_parser()
-        # expected = {}
-        # for acq in parser.acquisitions:
-        #     expected.setdefault(acq.srcSidecar.scan, []).append(acq.dstRoot)
-        # return expected
-        return self.get_xnat_map()
+        """Get the expected bids output name for each scan on xnat.
+
+        Returns:
+            :obj:`dict`: A dictionary mapping each :obj:`datman.xnat.XnatScan`
+                object to the bids file name it is expected to create.
+        """
+        xnat_parser = self.get_xnat_parser()
+        xnat_map = {}
+        for acq in xnat_parser.acquisitions:
+            xnat_map.setdefault(acq.srcSidecar.scan, []).append(acq.dstRoot)
+        return xnat_map
 
     def get_actual_scans(self):
-        return self.get_local_map()
+        """Get the actual exported files mapped to their xnat source scan.
+
+        Returns:
+            :obj:`dict`: A dictionary mapping each :obj:`datman.xnat.XnatScan`
+                object to the bids file it has created.
+        """
+        local_parser = self.get_local_parser()
+
+        local_map = {}
+        expected_series_nums = [scan.series for scan in self.experiment.scans]
+        repeat_num = self.session.session
+
+        for acq in local_parser.acquisitions:
+            sidecar = acq.srcSidecar
+
+            if ('Repeat' in sidecar.data and
+                    sidecar.data['Repeat'] != repeat_num):
+                continue
+
+            if 'SeriesNumber' not in sidecar.data:
+                continue
+
+            # If an exported scan gets split into multiple outputs
+            # (e.g. fmaps), one will have '10' prefixed to
+            # its actual source series number. Throw this away.
+            series = str(sidecar.data['SeriesNumber'])
+            if series not in expected_series_nums:
+                if len(series) < 3:
+                    continue
+                tmp_series = str(int(series[2:]))
+                if tmp_series not in expected_series_nums:
+                    # Not a split series, just unrecognized. Ignore it.
+                    continue
+                series = tmp_series
+
+            found = None
+            for scan in self.experiment.scans:
+                if scan.series == str(series):
+                    found = scan
+
+            if not found:
+                continue
+
+            # Handle previously renamed series
+            # This may happen when there are multiple runs, but an
+            # early one fails to extract.
+            dst_path = os.path.join(self.bids_folder, acq.dstRoot)
+            if dst_path != acq.srcRoot:
+                dst_path = acq.srcRoot.replace(self.bids_folder, "")
+            else:
+                dst_path = acq.dstRoot
+
+            local_map.setdefault(found, []).append(dst_path)
+
+        return local_map
 
     def check_contents(self, expected, actual):
+        """Compare exported bids files to expected files and report issues.
+
+        At a later date this should be updated to handle split series.
+        Currently it will ignore any split series with incorrect run numbers.
+
+        Args:
+            expected :obj:`dict`: A dictionary mapping each
+                :obj:`datman.xnat.XnatScan` to its expected name on the
+                file system.
+            actual :obj:`dict`: A dictionary mapping each exported
+                :obj:`datman.xnat.XnatScan` to its name on the file system.
+
+        Returns:
+            (:obj:`dict`, :obj:`dict`): A tuple of dictionaries. The first
+                is a dictionary mapping the current file name to the
+                expected file name to help locate files with incorrect
+                run numbers. The second is a dictionary mapping the
+                :obj:`datman.xnat.XnatScan` object to its expected name,
+                containing all entries that are missing from the bids dir.
+        """
         misnamed = {}
         missing = {}
         for scan in expected:
             if scan not in actual:
-                # Ignore scans with error files from prev dcm2niix fails
+                # Report a missing scan, if it doesnt have _niix.err file
                 for out_name in expected[scan]:
                     err_file = os.path.join(
                         self.bids_folder, out_name + "_niix.err"
@@ -263,18 +342,27 @@ class BidsExporter(SessionExporter):
             actual_name = actual[scan][0]
             if expected_name == actual_name:
                 continue
+
             misnamed[actual_name] = expected_name
 
         return misnamed, missing
 
     def handle_missing_scans(self, missing_scans, niix_log):
-        # This should be refactored
+        """Write an error log for scans that failed extraction.
+
+        Args:
+            missing_scans (:obj:`dict`): A dictionary of un-exported scans
+                to write error files for. The keys should be the XnatScan
+                object, and the values the expected file name.
+            niix_log (:obj:`bytes`): The byte log output from an attempted
+                run of dcm2niix.
+        """
         series_log = parse_niix_log(niix_log, self.experiment.scans)
         for scan in missing_scans:
             if scan.series not in series_log:
                 error_msg = (
-                    f"dcm2niix failed to create nifti for {scan}. Data may require "
-                    "manual intervention or blacklisting.\n"
+                    f"dcm2niix failed to create nifti for {scan}. "
+                    "Data may require manual intervention or blacklisting.\n"
                 )
             else:
                 error_msg = "\n".join(series_log[scan.series])
@@ -284,6 +372,12 @@ class BidsExporter(SessionExporter):
                 self.write_error_file(fname, error_msg)
 
     def write_error_file(self, fname, error_msg):
+        """Write an error log for a given bids file.
+
+        Args:
+            fname (str): An intended bids output file name.
+            error_msg (str): The error message to record.
+        """
         out_name = os.path.join(self.bids_folder, fname + "_niix.err")
 
         root_dir, _ = os.path.split(out_name)
@@ -302,6 +396,12 @@ class BidsExporter(SessionExporter):
             )
 
     def fix_run_numbers(self, misnamed_scans):
+        """Rename scans with incorrect run numbers.
+
+        Args:
+            misnamed_scans (:obj:`dict`): A dictionary mapping existing file
+                names to their correct names.
+        """
         for orig_name in misnamed_scans:
             source_path = os.path.join(self.bids_folder, orig_name)
             dest_path = os.path.join(
@@ -316,6 +416,13 @@ class BidsExporter(SessionExporter):
                 os.rename(found, dest_path + ext)
 
     def get_xnat_parser(self):
+        """Get a dcm2bids SidecarPairing for the current xnat experiment.
+
+        Returns:
+            dcm2bids.sidecar.SidecarPairing: The object that contains
+                information about the output names for each pseudo XNAT
+                sidecar.
+        """
         participant = dcm2bids.Participant(
             self.bids_sub, session=self.bids_ses
         )
@@ -334,7 +441,8 @@ class BidsExporter(SessionExporter):
         xnat_parser.build_graph()
         xnat_parser.build_acquisitions(participant)
 
-        # Use this to find scans that have extra 'criteria' for single match
+        # Use this to find scans that have 'criteria' in addition
+        # to series description
         extra_acqs = []
         for sidecar, descriptions in xnat_parser.graph.items():
             if len(descriptions) > 1:
@@ -348,6 +456,12 @@ class BidsExporter(SessionExporter):
         return xnat_parser
 
     def get_local_parser(self):
+        """Get a dcm2bids SidecarPairing for all already exported files.
+
+        Returns:
+            dcm2bids.sidecar.SidecarPairing: The object that contains
+                information about the output names for each json sidecar
+        """
         participant = dcm2bids.Participant(
             self.bids_sub, session=self.bids_ses
         )
@@ -406,17 +520,6 @@ class BidsExporter(SessionExporter):
         if missing:
             return False
 
-        # sidecars = self.get_sidecars()
-        # repeat_nums = [sidecars[path].get("Repeat") for path in sidecars]
-
-        # if any([repeat == self.repeat for repeat in repeat_nums]):
-        #     return True
-
-        # if self.repeat == "01" and sidecars:
-        #     # Catch instances where adding repeat to sidecars failed.
-        #     return True
-
-        # return False
         return True
 
     def needs_raw_data(self):
@@ -441,28 +544,10 @@ class BidsExporter(SessionExporter):
 
         self.make_output_dir()
 
-        # input_dir = self._get_scan_dir(raw_data_dir)
-        # try:
-        #     dcm2bids_app = Dcm2bids(
-        #         input_dir,
-        #         self.bids_sub,
-        #         self.dcm2bids_config,
-        #         output_dir=self.bids_folder,
-        #         session=self.bids_ses,
-        #         clobber=self.clobber,
-        #         forceDcm2niix=self.force_dcm2niix,
-        #         log_level=self.log_level
-        #     )
-        #     dcm2bids_app.run()
-        # except Exception as exc:
-        #     logger.error(
-        #         f"Dcm2Bids failed to run for {self.output_dir}. "
-        #         f"{type(exc)}: {exc}"
-        #     )
         try:
             self.run_dcm2bids(raw_data_dir)
         except Exception as e:
-            print(f"Failed to extract data. {e}")
+            logger.error(f"Failed to extract {self.experiment}. {e}")
 
         try:
             self.add_repeat_num()
@@ -481,7 +566,10 @@ class BidsExporter(SessionExporter):
         input_dir = self._get_scan_dir(raw_data_dir)
 
         if self.refresh and not os.path.exists(input_dir):
-            logger.error(f"Cannot refresh contents of {self.output_dir}, no files found at {input_dir}.")
+            logger.error(
+                f"Cannot refresh contents of {self.output_dir}, "
+                f"no files found at {input_dir}."
+            )
             return
 
         # Only run dcm2niix the first try, on the second just export the
@@ -522,145 +610,6 @@ class BidsExporter(SessionExporter):
         if rename:
             self.fix_run_numbers(rename)
 
-        # #################################################################
-        # # Everything from here down must be cleaned up
-
-        # exported_jsons = self.find_outputs(".json")
-        # exported_names = [
-        #     fname.replace(self.bids_folder, "").replace(".json", "")
-        #     for fname in exported_jsons
-        # ]
-        # # Maybe join the entry lines together with new line again, since
-        # # only need this stuff to write to file.
-        # series_log = parse_niix_log(niix_log, self.experiment.scans)
-        # xnat_parser = self.get_xnat_parser()
-        # # series_map = {
-        # #     acq.srcSidecar.scan: acq.dstRoot for acq in xnat_parser.acquisitions
-        # # }
-        # # xnat_map = {
-        # #     acq.dstRoot: acq.srcSidecar.scan for acq in xnat_parser.acquisitions
-        # # }
-        # # xnat_map = {
-        # #     acq.srcSidecar.scan: acq.dstRoot for acq in xnat_parser.acquisitions
-        # # }
-        # xnat_map = {}
-        # for acq in xnat_parser.acquisitions:
-        #     xnat_map.setdefault(acq.srcSidecar.scan, []).append(acq.dstRoot)
-
-        # local_map = self.get_local_map()
-
-        # # missing = {
-        # #     path: xnat_map[path] for path in xnat_map if path not in local_map
-        # # }
-        # # found = {}
-        # # for xnat_path, xnat_scan in xnat_map.items():
-        # #     for local_path, local_scan in local_map.items():
-        # #         if xnat_scan == local_scan:
-        # #             found[local_scan] = local_path
-        # # Rename series that probably have multiple runs where one
-        # rename = {}
-        # missing = {}
-        # for scan in xnat_map:
-        #     if scan not in local_map:
-        #         missing[scan] = xnat_map[scan][0]
-        #         continue
-        #     if len(xnat_map[scan]) != 1:
-        #         continue
-        #     if len(local_map[scan]) != 1:
-        #         continue
-        #     if xnat_map[scan][0] == local_map[scan][0]:
-        #         continue
-        #     rename[local_map[scan][0]] = xnat_map[scan][0]
-
-        # for scan in missing:
-        #     if scan.series not in series_log:
-        #         print(f"{scan} -> {missing[scan]} failed dcm2niix export")
-        # for orig_name in rename:
-        #     print(f"Renaming {orig_name} -> {rename[orig_name]}")
-
-    def report_export_issues(self, xnat_map, local_map, series_log):
-        rename = {}
-        missing = {}
-        for scan in xnat_map:
-            if scan not in local_map:
-                #!!!!!!! Note the [0] should probably be dropped. kept for testing.
-                missing[scan] = xnat_map[scan][0]
-                continue
-            if len(xnat_map[scan]) != 1:
-                continue
-            if len(local_map[scan]) != 1:
-                continue
-            if xnat_map[scan][0] == local_map[scan][0]:
-                continue
-            rename[local_map[scan][0]] = xnat_map[scan][0]
-
-        for scan in missing:
-            if scan.series not in series_log:
-                print(f"{scan} -> {missing[scan]} failed dcm2niix export")
-        for orig_name in rename:
-            print(f"Renaming {orig_name} -> {rename[orig_name]}")
-
-        return rename, missing
-
-    def get_xnat_map(self):
-        xnat_parser = self.get_xnat_parser()
-        # series_map = {
-        #     acq.srcSidecar.scan: acq.dstRoot for acq in xnat_parser.acquisitions
-        # }
-        # xnat_map = {
-        #     acq.dstRoot: acq.srcSidecar.scan for acq in xnat_parser.acquisitions
-        # }
-        # xnat_map = {
-        #     acq.srcSidecar.scan: acq.dstRoot for acq in xnat_parser.acquisitions
-        # }
-        xnat_map = {}
-        for acq in xnat_parser.acquisitions:
-            xnat_map.setdefault(acq.srcSidecar.scan, []).append(acq.dstRoot)
-        return xnat_map
-
-    def get_local_map(self):
-        local_parser = self.get_local_parser()
-        # Map exported local scans to the xnat series
-        local_map = {}
-        xnat_series_nums = [scan.series for scan in self.experiment.scans]
-        for acq in local_parser.acquisitions:
-            sidecar = acq.srcSidecar
-            if 'Repeat' in sidecar.data and sidecar.data['Repeat'] != self.session.session:
-                continue
-            if 'SeriesNumber' not in sidecar.data:
-                continue
-            series = sidecar.data['SeriesNumber']
-            if str(series) not in xnat_series_nums:
-                # This may be one of the split series, which get '10' prefixed
-                # strip it and check again
-                # Convert to int to trim preceding zeries
-                tmp_series = str(int(str(series)[2:]))
-                if tmp_series not in xnat_series_nums:
-                    # It's just not a recognized series
-                    continue
-                # It IS a prefixed one, so replace with orig num
-                series = tmp_series
-            found = None
-            for scan in self.experiment.scans:
-                if scan.series == str(series):
-                    found = scan
-            if not found:
-                continue
-
-            # Handle previously renamed series
-            # This happens when there are multiple runs but an
-            # early one has completely failed to extract.
-            # (i.e. dcm2bids things the run number differs from what it
-            # _should_ be if all had extracted)
-            dst_path = os.path.join(self.bids_folder, acq.dstRoot)
-            if dst_path != acq.srcRoot:
-                dst_path = acq.srcRoot.replace(self.bids_folder, "")
-            else:
-                dst_path = acq.dstRoot
-
-            local_map.setdefault(found, []).append(dst_path)
-        return local_map
-
     def add_repeat_num(self):
         orig_contents = self.get_sidecars()
 
@@ -692,131 +641,6 @@ class BidsExporter(SessionExporter):
         sidecars = self.find_outputs(".json")
         contents = {path: read_json(path) for path in sidecars}
         return contents
-
-    def find_missing_scans(self):
-        """Find scans that exist on xnat but are missing from the bids folder.
-        """
-        class FakeSidecar(dcm2bids.Sidecar):
-            """Turns XNAT series descriptions into pseudo-sidecars.
-            """
-            def __init__(self, xnat_scan):
-                self.scan = xnat_scan
-                self.data = xnat_scan
-                self.compKeys = dcm2bids.DEFAULT.compKeys
-
-                # Placeholders for compatibility with dcm2bids.Sidecar
-                self.root = (
-                    f"/tmp/{xnat_scan.series}"
-                    + f"_{xnat_scan.description}"
-                    + f"_{xnat_scan.subject}"
-                )
-                self.filename = f"{self.root}.json"
-                self.data["SidecarFilename"] = self.filename
-
-            @property
-            def data(self):
-                return self._data
-
-            @data.setter
-            def data(self, scan):
-                self._data = OrderedDict()
-                self._data['SeriesDescription'] = scan.description
-                self._data['SeriesNumber'] = scan.series
-
-            def __repr__(self):
-                return f"<FakeSidecar {self.data['SeriesDescription']}>"
-
-        def get_expected_names(participant, sidecars, bids_conf):
-            parser = dcm2bids.SidecarPairing(
-                sidecars, bids_conf["descriptions"]
-            )
-            parser.build_graph()
-            parser.build_acquisitions(participant)
-            parser.find_runs()
-            return [acq.dstRoot for acq in parser.acquisitions]
-
-        def remove_criteria(descriptions):
-            trim_conf = []
-            for descr in bids_conf['descriptions']:
-                new_descr = descr.copy()
-                if len(descr['criteria']) > 1:
-                    new_descr['criteria'] = OrderedDict()
-                    new_descr['criteria']['SeriesDescription'] = descr[
-                        'criteria']['SeriesDescription']
-                trim_conf.append(new_descr)
-            return trim_conf
-
-        participant = dcm2bids.Participant(
-            self.bids_sub, session=self.bids_ses
-        )
-
-        bids_conf = dcm2bids.load_json(self.dcm2bids_config)
-
-        bids_tmp = os.path.join(
-            self.bids_folder,
-            "tmp_dcm2bids",
-            f"{self.session.bids_sub}_{self.session.bids_ses}"
-        )
-
-        local_sidecars = []
-        for search_path in [self.output_dir, bids_tmp]:
-            for item in self.find_outputs(".json", start_dir=search_path):
-                sidecar = dcm2bids.Sidecar(item)
-                if 'Repeat' in sidecar.data and sidecar.data['Repeat'] != self.session.session:
-                    continue
-                local_sidecars.append(sidecar)
-        local_sidecars = sorted(local_sidecars)
-
-        xnat_sidecars = []
-        for scan in self.experiment.scans:
-            xnat_sidecars.append(FakeSidecar(scan))
-        xnat_sidecars = sorted(xnat_sidecars)
-
-        # xnat_scans = get_expected_names(
-        #     participant, xnat_sidecars, bids_conf
-        # )
-        local_scans = get_expected_names(
-            participant, local_sidecars, bids_conf
-        )
-
-        # Use a more permissive bids_conf when finding xnat acqs
-        xnat_parser = dcm2bids.SidecarPairing(
-            xnat_sidecars, remove_criteria(bids_conf['descriptions'])
-        )
-        xnat_parser.build_graph()
-        xnat_parser.build_acquisitions(participant)
-        # Use this to find scans that have extra 'criteria' for single match
-        extra_acqs = []
-        for sidecar, descriptions in xnat_parser.graph.items():
-            if len(descriptions) > 1:
-                for descr in descriptions:
-                    acq = Acquisition(participant, srcSidecar=sidecar, **descr)
-                    extra_acqs.append(acq)
-        xnat_parser.acquisitions.extend(extra_acqs)
-        xnat_parser.find_runs()
-        xnat_scans = [acq.dstRoot for acq in xnat_parser.acquisitions]
-
-        missing_scans = []
-        for scan in xnat_scans:
-            if scan not in local_scans:
-                if "run-01" in scan:
-                    norun_scan = scan.replace("_run-01", "")
-                    if norun_scan not in local_scans:
-                        missing_scans.append(scan)
-                else:
-                    missing_scans.append(scan)
-
-        extra_scans = []
-        for scan in local_scans:
-            if scan not in xnat_scans:
-                if "run-01" in scan:
-                    norun_scan = scan.replace("_run-01", "")
-                    if norun_scan not in xnat_scans:
-                        extra_scans.append(scan)
-                else:
-                    extra_scans.append(scan)
-
-        return missing_scans, extra_scans
 
 
 class NiiLinkExporter(SessionExporter):
@@ -1963,7 +1787,7 @@ SERIES_EXPORTERS = {
 
 
 class FakeSidecar(dcm2bids.Sidecar):
-    """Turns XNAT series descriptions into pseudo-sidecars.
+    """Turns XNAT series into pseudo-sidecars.
     """
     def __init__(self, xnat_scan):
         self.scan = xnat_scan
@@ -2004,6 +1828,17 @@ def get_expected_names(participant, sidecars, bids_conf):
 
 
 def remove_criteria(descriptions):
+    """Remove any dcm2bids config criteria except 'SeriesDescription'.
+
+    Args:
+        descriptions (:obj:`list`): A list of :obj:`collections.OrderedDict`
+            from the dicom2bids config 'descriptions' field.
+
+    Returns:
+        :obj:`list`: A list of :obj:`collections.OrderedDict` 'descriptions'
+            containing only the 'SeriesDescription' criteria from the
+            original configuration file for each entry.
+    """
     trim_conf = []
     for descr in descriptions:
         new_descr = descr.copy()
@@ -2016,6 +1851,18 @@ def remove_criteria(descriptions):
 
 
 def parse_niix_log(niix_output, xnat_scans):
+    """Parse dcm2niix log output.
+
+    Args:
+        niix_output (:obj:`bytes`): The byte stdout output from running
+            dcm2niix.
+        xnat_scans (:obj:`list`): A list of :obj:`datman.xnat.XnatScan`
+            objects.
+
+    Returns:
+        dict: A dictionary mapping each scan series number to a list of
+            string log output lines.
+    """
     log_lines = sort_log(niix_output.split(b"\n"))
 
     series_log = {}
