@@ -42,22 +42,23 @@ class XnatPipelineSettings:
 
     For example:
 
-    # This starts the config block
-    XnatPipelines:
-        # This key should match the folder name (case-sensitive) in each
-        # experiment's resources folder that holds the pipeline outputs.
-        'BIDS':
-          # This stops the built in exporter from running to prevent
-          # redundant outputs / wasted time.
-          # If 'override' is defined, then 'dest' must be also.
-          'override': 'bids'
-          # The location to store the files, relative to the study's root dir.
-          'dest': 'data/bids'
+    .. code-block:: yaml
 
-        # If override isn't used, the 'dest' path can be supplied directly.
-        'MRIQC': 'pipelines/mriqc_25'
-        'FMRIPREP': 'pipelines/fmriprep'
+        # This starts the config block
+        XnatPipelines:
+            # This key should match the folder name (case-sensitive) in each
+            # experiment's resources folder that holds the pipeline outputs.
+            'BIDS':
+            # This stops the built in exporter from running to prevent
+            # redundant outputs / wasted time.
+            # If 'override' is defined, then 'dest' must be also.
+            'override': 'bids'
+            # The location to store the files, relative to the study's root dir.
+            'dest': 'data/bids'
 
+            # If override isn't used, the 'dest' path can be supplied directly.
+            'MRIQC': 'pipelines/mriqc_25'
+            'FMRIPREP': 'pipelines/fmriprep'
     """
     def __init__(self, config):
         """Retrieves and verifies pipeline settings from the datman config.

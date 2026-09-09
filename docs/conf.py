@@ -49,7 +49,7 @@ extensions = [
     'sphinx.ext.linkcode',
     'sphinx.ext.mathjax',
     'sphinx.ext.napoleon',
-    'sphinxcontrib.apidoc'
+    'sphinx.ext.apidoc',
 ]
 
 # Add any paths that contain templates here, relative to this directory.
@@ -68,7 +68,7 @@ master_doc = 'index'
 #
 # This is also used if you do content translation via gettext catalogs.
 # Usually you set "language" from the command line for these cases.
-language = None
+language = 'en'
 
 # List of patterns, relative to source directory, that match files and
 # directories to ignore when looking for source files.
@@ -111,14 +111,6 @@ linkcode_resolve = make_linkcode_resolve('datman',
 # -- Options for intersphinx extension ---------------------------------------
 
 # Example configuration for intersphinx: refer to the Python standard library.
-intersphinx_mapping = {'https://docs.python.org/': None}
-
-# -- Options for versioning extension ----------------------------------------
-scv_show_banner = True
-scv_whitelist_branches = ('master', re.compile(r'^docs\/.*$'), 'test_docs')
-scv_whitelist_tags = (
-    re.compile(r'^\d{2,}\..*$'),
-    re.compile(r'^[1-9]\..*$'),
-    re.compile(r'^0\.\d{2,}\..*$'),
-    re.compile(r'^0\.[2-9]\..*$'),
-)
+intersphinx_mapping = {
+    "python": ("https://docs.python.org/3", None),
+}
